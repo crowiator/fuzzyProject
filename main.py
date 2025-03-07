@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
-
+import pywt
 # 1️⃣ Funkcia na načítanie EKG signálu a anotácií
 def load_mitbih_record(record_name, path="./mit/"):
     """Načíta EKG signál a anotácie z MIT-BIH databázy."""
@@ -32,6 +32,18 @@ def butter_highpass(signal, cutoff=0.5, fs=360, order=4):
     filtered_signal = filtfilt(b, a, signal)
     return filtered_signal
 
+
+def wavelet_denoising(signal, wavelet='db4', level=4):
+    coeffs = pywt.wavedec(signal, wavelet, level=level)
+    threshold = np.median(np.abs(coeffs[-level])) / 0.6745
+
+    # Aplikácia soft thresholdingu na koeficienty
+    coeffs_thresholded = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
+
+    # Rekonštrukcia signálu
+    denoised_signal = pywt.waverec(coeffs_thresholded, wavelet)
+    return denoised_signal
+
 # 3️⃣ Funkcia na vykreslenie porovnania surového a filtrovaného signálu
 def compare_signals(raw_signal, filtered_signal, r_peaks, record_name, num_samples=1000):
     """Porovná surový a filtrovaný EKG signál vedľa seba."""
@@ -39,19 +51,19 @@ def compare_signals(raw_signal, filtered_signal, r_peaks, record_name, num_sampl
 
     # 🔹 1. Graf - Surový signál
     plt.subplot(1, 2, 1)
-    plt.plot(raw_signal[:num_samples], label="Surový signál", color="b")
+    plt.plot(raw_signal[:num_samples], label="Butterworth filter", color="b")
     plt.scatter(r_peaks[r_peaks < num_samples], raw_signal[r_peaks[r_peaks < num_samples]], color="r", marker='o', label="R-peaky")
     plt.xlabel("Vzorky")
     plt.ylabel("Amplitúda")
-    plt.title(f"Surový EKG signál - {record_name}")
+    plt.title(f"Butterworth filter - {record_name}")
     plt.legend()
 
     # 🔹 2. Graf - Filtrovaný signál
     plt.subplot(1, 2, 2)
-    plt.plot(filtered_signal[:num_samples], label="Filtrovaný signál", color="g")
+    plt.plot(filtered_signal[:num_samples], label="DWT ", color="g")
     plt.scatter(r_peaks[r_peaks < num_samples], filtered_signal[r_peaks[r_peaks < num_samples]], color="r", marker='o', label="R-peaky")
     plt.xlabel("Vzorky")
-    plt.title(f"Filtrovaný EKG signál - {record_name}")
+    plt.title(f"Waveletová transformácia (DWT) - {record_name}")
     plt.legend()
 
     plt.tight_layout()
@@ -66,6 +78,5 @@ if __name__ == "__main__":
     if raw_signal is not None:
         # Odstránenie baseline driftu
         filtered_signal = butter_highpass(raw_signal, fs=fs)
-
-        # Porovnanie signálov
-        compare_signals(raw_signal, filtered_signal, r_peaks, record_name)
+        denoised_signal = wavelet_denoising(signal=raw_signal, wavelet='db4', level=4)
+        compare_signals(filtered_signal, denoised_signal, r_peaks, record_name)
