@@ -36,38 +36,42 @@ def butter_highpass(signal, cutoff=0.5, fs=360, order=4):
 def wavelet_denoising(signal, wavelet='db4', level=4):
     coeffs = pywt.wavedec(signal, wavelet, level=level)
     threshold = np.median(np.abs(coeffs[-level])) / 0.6745
-
-    # Aplikácia soft thresholdingu na koeficienty
     coeffs_thresholded = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
-
-    # Rekonštrukcia signálu
     denoised_signal = pywt.waverec(coeffs_thresholded, wavelet)
+
+    # Kontrola dĺžky
+    if len(denoised_signal) > len(signal):
+        denoised_signal = denoised_signal[:len(signal)]
+    elif len(denoised_signal) < len(signal):
+        denoised_signal = np.pad(denoised_signal, (0, len(signal) - len(denoised_signal)), 'constant')
+
     return denoised_signal
 
 # 3️⃣ Funkcia na vykreslenie porovnania surového a filtrovaného signálu
-def compare_signals(raw_signal, filtered_signal, r_peaks, record_name, num_samples=1000):
-    """Porovná surový a filtrovaný EKG signál vedľa seba."""
+def compare_signals(filtered_signal, denoised_signal, r_peaks, record_name, num_samples=1000):
     plt.figure(figsize=(12, 5))
 
-    # 🔹 1. Graf - Surový signál
+    # 🔹 1. Graf - Butterworth filter (baseline drift odstránený)
     plt.subplot(1, 2, 1)
-    plt.plot(raw_signal[:num_samples], label="Butterworth filter", color="b")
-    plt.scatter(r_peaks[r_peaks < num_samples], raw_signal[r_peaks[r_peaks < num_samples]], color="r", marker='o', label="R-peaky")
-    plt.xlabel("Vzorky")
-    plt.ylabel("Amplitúda")
-    plt.title(f"Butterworth filter - {record_name}")
-    plt.legend()
-
-    # 🔹 2. Graf - Filtrovaný signál
-    plt.subplot(1, 2, 2)
-    plt.plot(filtered_signal[:num_samples], label="DWT ", color="g")
+    plt.plot(filtered_signal[:num_samples], label="Po Butterworth filtre", color="b")
     plt.scatter(r_peaks[r_peaks < num_samples], filtered_signal[r_peaks[r_peaks < num_samples]], color="r", marker='o', label="R-peaky")
     plt.xlabel("Vzorky")
-    plt.title(f"Waveletová transformácia (DWT) - {record_name}")
+    plt.ylabel("Amplitúda")
+    plt.title(f"EKG po Butterworth filtre - {record_name}")
+    plt.legend()
+
+    # 🔹 2. Graf - Po Waveletovej filtrácii (DWT)
+    plt.subplot(1, 2, 2)
+    plt.plot(denoised_signal[:num_samples], label="Po DWT filtrácii", color="g")
+    plt.scatter(r_peaks[r_peaks < num_samples], denoised_signal[r_peaks[r_peaks < num_samples]], color="r", marker='o', label="R-peaky")
+    plt.xlabel("Vzorky")
+    plt.ylabel("Amplitúda")
+    plt.title(f"EKG po Wavelet filtrácii (DWT) - {record_name}")
     plt.legend()
 
     plt.tight_layout()
     plt.show()
+
 
 
 # 4️⃣ Hlavná časť programu
@@ -77,6 +81,10 @@ if __name__ == "__main__":
 
     if raw_signal is not None:
         # Odstránenie baseline driftu
+        # 1. Odstránenie baseline driftu
         filtered_signal = butter_highpass(raw_signal, fs=fs)
-        denoised_signal = wavelet_denoising(signal=raw_signal, wavelet='db4', level=4)
-        compare_signals(filtered_signal, denoised_signal, r_peaks, record_name)
+
+        # 2. Odstránenie vysokofrekvenčného šumu pomocou DWT
+        denoised_signal = wavelet_denoising(signal=filtered_signal, wavelet='db4', level=4)
+
+    compare_signals(filtered_signal, denoised_signal, r_peaks, record_name)
