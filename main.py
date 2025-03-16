@@ -9,7 +9,7 @@ import pywt
 import neurokit2 as nk
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
-
+from collections import Counter
 from biosppy.signals import ecg
 from scipy.integrate import trapezoid
 
@@ -31,13 +31,11 @@ def load_mitbih_record(record_name, path="./mit/"):
 
         # aby neobshahoval nejake speicalne symboly
         beat_types = annotation.symbol
-        valid_beats = ["N", "L", "R", "V", "A"]
-        filtered_r_peaks, filtered_beat_types = zip(
-            *[(r, bt) for r, bt in zip(r_peak_positions, beat_types) if bt in valid_beats]
-        )
-        print(beat_types)
+        # Početnosť jednotlivých symbolov
+        beat_counts = Counter(annotation.symbol)
 
-        return signal, fs, r_peak_positions, filtered_beat_types
+
+        return signal, fs, r_peak_positions, beat_counts
     except Exception as e:
         print(f"❌ Chyba pri načítaní záznamu {record_name}: {e}")
         return None, None, None, None
@@ -371,6 +369,18 @@ if __name__ == "__main__":
         # 1. Odstránenie baseline driftu
         filtered_signal = butter_highpass(raw_signal, fs=fs)
 
+        if filtered_signal is not None:
+            # 2. Vizualizácia výsledkov
+            plt.figure(figsize=(12, 6))
+            plt.plot(raw_signal, label="Pôvodný ECG signál", alpha=0.7)
+            plt.plot(filtered_signal, label="Filtrovaný ECG signál (HPF)", linewidth=2)
+            plt.xlabel("Čas (vzorky)")
+            plt.ylabel("Amplitúda")
+            plt.title("Butterworth vysokopriepustný filter (4. rád, 0.5 Hz)")
+            plt.legend()
+            plt.grid()
+            plt.show()
+        """
         # 2. Odstránenie vysokofrekvenčného šumu pomocou DWT
         denoised_signal = wavelet_denoising(signal=filtered_signal, wavelet='db4', level=4)
 
@@ -385,15 +395,16 @@ if __name__ == "__main__":
         q_peaks = np.where(processed_signals["ECG_Q_Peaks"] == 1)[0]
         r_peaks = np.where(processed_signals["ECG_R_Peaks"] == 1)[0]
         t_peaks = np.where(processed_signals["ECG_T_Peaks"] == 1)[0]
-        print(f"P vlna {p_peaks}")
+       # print(f"P vlna {p_peaks}")
         # 5. Vylepšená detekcia S-píkov
-        s_peaks = detect_s_peaks(denoised_signal, r_peaks, t_peaks, fs)
+        #s_peaks = detect_s_peaks(denoised_signal, r_peaks, t_peaks, fs)
 
         # 6. Vizualizácia P, Q, R, S, T píkov
 
-        plot_peaks(denoised_signal, p_peaks, q_peaks, r_peaks, s_peaks, t_peaks, fs, record_name)
-        features = extract_features(denoised_signal, r_peaks, q_peaks, s_peaks, t_peaks, p_peaks, fs)
-        print(features)
-        fuzzy_logic_classification(features)
+       # plot_peaks(denoised_signal, p_peaks, q_peaks, r_peaks, s_peaks, t_peaks, fs, record_name)
+       # features = extract_features(denoised_signal, r_peaks, q_peaks, s_peaks, t_peaks, p_peaks, fs)
+        #print(features)
+        #fuzzy_logic_classification(features)
+        """
 
 
