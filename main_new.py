@@ -209,7 +209,7 @@ def detect_r_peaks(integrated_signal, fs, threshold_factor=0.4):
     threshold = threshold_factor * np.max(integrated_signal)
 
     # Použijeme find_peaks() pre lepšiu detekciu lokálnych maxím
-    peaks, _ = find_peaks(integrated_signal, height=threshold, distance=int(0.2 * fs), prominence=0.1)
+    peaks, _ = find_peaks(integrated_signal, height=threshold, distance=int(0.2 * fs), prominence=0.01)
 
     return peaks
 
@@ -305,6 +305,17 @@ def compare_with_annotations(detected_peaks, annotated_peaks, fs, tolerance=50):
 
     return accuracy, tp, fn, fp
 
+def find_matching_peaks(annotated_peaks, detected_peaks, fs, tolerance=50):
+    """Nájde počet správne detegovaných R-peakov s toleranciou (50 ms)."""
+    # /1000 lebo prevadzam na milisekundy
+    tolerance_samples = int((tolerance / 1000) * fs)  # Konverzia na počet vzoriek
+
+    matched = []
+    for peak in detected_peaks:
+        if np.any(np.abs(annotated_peaks - peak) <= tolerance_samples):
+            matched.append(peak)
+
+    return np.array(matched)
 def process_ecg_with_comparison(record_name="100", path="./mit/", duration=5, tolerance=50):
     raw_signal, fs, annotated_r_peaks, _ = load_mitbih_record(record_name, path)
     print(f"Anotovane R peaky: {annotated_r_peaks}")
@@ -332,9 +343,12 @@ def process_ecg_with_comparison(record_name="100", path="./mit/", duration=5, to
     print(f"Detekovane r-peakov {detected_r_peaks}")
     print(f" Pocet Detekovane r-peakov {len(detected_r_peaks)}")
 
+    common_peaks = find_matching_peaks(annotated_r_peaks, detected_r_peaks, fs, tolerance=50)
+    print(f"✅ Počet správne detegovaných R-peakov s toleranciou: {len(common_peaks)}")
+    print(f"🚨 Počet chýbajúcich R-peakov: {len(annotated_r_peaks) - len(common_peaks)}")
+    print(f"❌ Počet falošných detekcií: {len(detected_r_peaks) - len(common_peaks)}")
     # 6. Porovnanie s anotáciami MIT-BIH
     accuracy, tp, fn, fp = compare_with_annotations(detected_r_peaks, annotated_r_peaks, fs, tolerance)
-    missing_peaks = np.setdiff1d(annotated_r_peaks, detected_r_peaks)
     # 7. Vizualizácia detegovaných a anotovaných R-vĺn
     time_axis = np.arange(min(len(raw_signal), len(filtered_signal), int(fs * duration))) / fs
     detected_peaks_within_range = detected_r_peaks[detected_r_peaks < len(time_axis)]
@@ -359,10 +373,78 @@ def process_ecg_with_comparison(record_name="100", path="./mit/", duration=5, to
     plt.grid()
     plt.show()
 
+################################################################
+# Segmentacia
+#➡ Pre každú R-vlnu vyberieme segment signálu od R-0.2s do R+0.4s.
+#Vytvoríme pole segmentov, kde každý segment má rovnakú dĺžku.
+def segment_heartbeats(signal, r_peaks, fs, pre_R=0.2, post_R=0.4):
+    """
+    Segmentuje EKG signál na jednotlivé údery srdca okolo detegovaných R-vĺn.
 
+    Parametre:
+    - signal: EKG signál
+    - r_peaks: indexy R-peakov
+    - fs: vzorkovacia frekvencia
+    - pre_R: čas pred R-vlnou (v sekundách)
+    - post_R: čas po R-vlne (v sekundách)
+
+    Výstup:
+    - segments: pole segmentovaných úderov
+    """
+    pre_samples = int(pre_R * fs)  # Počet vzoriek pred R
+    post_samples = int(post_R * fs)  # Počet vzoriek po R
+
+    segments = []
+    for r in r_peaks:
+        if r - pre_samples >= 0 and r + post_samples < len(signal):
+            segment = signal[r - pre_samples:r + post_samples]
+            segments.append(segment)
+
+    return np.array(segments)
+
+def process_ecg_with_segmentation(record_name="100", path="./mit/", duration=5):
+    raw_signal, fs, _, _ = load_mitbih_record(record_name, path)
+    if raw_signal is None:
+        return
+
+    # 1. Odstránenie vysokofrekvenčného šumu
+    filtered_signal = lowpass_filter(raw_signal, fs, cutoff=40)
+
+    # 2. Odstránenie baseline driftu pomocou DWT
+    filtered_signal = dwt_filtering(filtered_signal, threshold_factor=0.15)
+
+    # 3. Z-score normalizácia
+    raw_signal = normalize_zscore(raw_signal)
+    filtered_signal = normalize_zscore(filtered_signal)
+
+    # 4. Pan-Tompkins metóda na zvýraznenie QRS komplexov
+    diff_signal = differentiate(filtered_signal)
+    squared_signal = squaring(diff_signal)
+    integrated_signal = moving_window_integration(squared_signal, window_size=10)
+
+    # 5. Detekcia R-peakov
+    detected_r_peaks = detect_r_peaks(integrated_signal, fs, threshold_factor=0.35)
+
+    # 6. Segmentácia EKG signálu na údery
+    segments = segment_heartbeats(filtered_signal, detected_r_peaks, fs)
+
+    # 7. Vizualizácia niekoľkých segmentov
+    plt.figure(figsize=(12, 6))
+    for i in range(min(5, len(segments))):  # Zobrazíme prvých 5 segmentov
+        plt.plot(segments[i], label=f"Segment {i+1}")
+
+    plt.xlabel("Time (samples)")
+    plt.ylabel("Amplitude")
+    plt.title("Segmentácia srdcových úderov (zarovnané na R-vlnu)")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    print(f"📊 Počet segmentov: {len(segments)}")
 # 4️⃣ Main Execution
 if __name__ == "__main__":
     #filter_and_validate_signal()
     #detect_r_peaks_on_filtered_signal()
     #process_ecg(record_name="100", path="./mit/", duration=5)
-    process_ecg_with_comparison(record_name="100", path="./mit/", duration=5, tolerance=50)
+    #process_ecg_with_comparison(record_name="100", path="./mit/", duration=5, tolerance=50)
+    process_ecg_with_segmentation(record_name="100", path="./mit/", duration=5)
