@@ -209,7 +209,7 @@ def detect_r_peaks(integrated_signal, fs, threshold_factor=0.4):
     threshold = threshold_factor * np.max(integrated_signal)
 
     # Použijeme find_peaks() pre lepšiu detekciu lokálnych maxím
-    peaks, _ = find_peaks(integrated_signal, height=threshold, distance=int(0.2 * fs), prominence=0.2)
+    peaks, _ = find_peaks(integrated_signal, height=threshold, distance=int(0.2 * fs), prominence=0.1)
 
     return peaks
 
@@ -307,6 +307,8 @@ def compare_with_annotations(detected_peaks, annotated_peaks, fs, tolerance=50):
 
 def process_ecg_with_comparison(record_name="100", path="./mit/", duration=5, tolerance=50):
     raw_signal, fs, annotated_r_peaks, _ = load_mitbih_record(record_name, path)
+    print(f"Anotovane R peaky: {annotated_r_peaks}")
+    print(f"Pocet Anotovane R peaky: {len(annotated_r_peaks)}")
     if raw_signal is None:
         return
 
@@ -326,11 +328,13 @@ def process_ecg_with_comparison(record_name="100", path="./mit/", duration=5, to
     integrated_signal = moving_window_integration(squared_signal, window_size=10)
 
     # 5. Detekcia R-peakov
-    detected_r_peaks = detect_r_peaks(integrated_signal, fs, threshold_factor=0.4)
+    detected_r_peaks = detect_r_peaks(integrated_signal, fs, threshold_factor=0.35)
+    print(f"Detekovane r-peakov {detected_r_peaks}")
+    print(f" Pocet Detekovane r-peakov {len(detected_r_peaks)}")
 
     # 6. Porovnanie s anotáciami MIT-BIH
     accuracy, tp, fn, fp = compare_with_annotations(detected_r_peaks, annotated_r_peaks, fs, tolerance)
-
+    missing_peaks = np.setdiff1d(annotated_r_peaks, detected_r_peaks)
     # 7. Vizualizácia detegovaných a anotovaných R-vĺn
     time_axis = np.arange(min(len(raw_signal), len(filtered_signal), int(fs * duration))) / fs
     detected_peaks_within_range = detected_r_peaks[detected_r_peaks < len(time_axis)]
