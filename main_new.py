@@ -440,7 +440,7 @@ def process_ecg_with_segmentation(record_name="100", path="./mit/", duration=5):
     plt.grid()
     plt.show()
 
-    print(f"📊 Počet segmentov: {len(segments)}")
+    print(f"📊 Počet segmentov: {len(segments)}")a
 # 4️⃣ Main Execution
 if __name__ == "__main__":
     #filter_and_validate_signal()
