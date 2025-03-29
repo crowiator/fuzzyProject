@@ -8,6 +8,7 @@ from scipy.signal import butter, filtfilt
 from scipy.signal import find_peaks
 from scipy.signal import welch
 matplotlib.use("TkAgg")
+import neurokit2 as nk
 
 
 # 1️⃣ Function to Load ECG Signal
@@ -30,8 +31,7 @@ def load_mitbih_record(record_name, path="./mit/"):
 
 
 # 2️⃣ DWT-Based Baseline Drift Removal
-import numpy as np
-import pywt
+
 
 
 def dwt_filtering(ecg_signal, wavelet='db4', level=9, threshold_factor=0.2):
@@ -444,251 +444,40 @@ def process_ecg_with_segmentation(record_name="100", path="./mit/", duration=5):
 
 
 
-
-def extract_rr_features(r_peaks, fs):
-    """
-    Vytvorí pole záznamov s RR intervalmi (v milisekundách) a priemerným RR intervalom (v milisekundách).
-
-    Parametre:
-    - r_peaks: indexy R-peakov
-    - fs: vzorkovacia frekvencia
-    Extrahuje RR intervaly a základné HRV príznaky."""
-    rr_intervals = np.diff(r_peaks) / fs  # Konverzia na sekundy
-
-    rr_previous = np.insert(rr_intervals, 0, rr_intervals[0])  # RR₀ (predchádzajúca srdcová frekvencia)
-    rr_next = np.append(rr_intervals, rr_intervals[-1])  # RR₁ (následná srdcová frekvencia)
-
-    # HRV metriky
-    sdnn = np.std(rr_intervals)  # Štandardná odchýlka RR intervalov
-    rmssd = np.sqrt(np.mean(np.diff(rr_intervals) ** 2))  # Root Mean Square of Successive Differences (RMSSD)
-
-    # Spektrálna analýza HRV (LF/HF pomer)
-    f, psd = welch(rr_intervals, fs=1/np.mean(rr_intervals), nperseg=len(rr_intervals))
-    lf_power = np.sum(psd[(f >= 0.04) & (f < 0.15)])
-    hf_power = np.sum(psd[(f >= 0.15) & (f < 0.4)])
-    lf_hf_ratio = lf_power / hf_power if hf_power > 0 else 0
-
-    return rr_previous, rr_next, sdnn, rmssd, lf_hf_ratio
-def extract_wave_amplitudes(segments):
-    """Extrahuje amplitúdy R, P a T vĺn z EKG segmentov."""
-    r_amplitudes = np.max(segments, axis=1)  # Amplitúda R-vlny
-
-    p_amplitudes = np.min(segments[:, :50], axis=1)  # P vlna je zvyčajne 50 vzoriek pred R
-    t_amplitudes = np.max(segments[:, 100:], axis=1)  # T vlna je približne 100 vzoriek po R
-
-    return r_amplitudes, p_amplitudes, t_amplitudes
-
-def extract_wave_durations(r_peaks, segments, fs):
-    """Presné meranie PQ, QRS, QT a ST intervalov pomocou lokálnych extrémov."""
-    pq_intervals, qrs_durations, qt_intervals, st_intervals = [], [], [], []
-
-    for i, r in enumerate(r_peaks):
-        segment = segments[i]
-
-        # Q bod je najnižší bod pred R
-        q_index = np.argmin(segment[:50])
-        q_time = (r - 50 + q_index) / fs
-
-        # S bod je najnižší bod po R
-        s_index = np.argmin(segment[50:100])
-        s_time = (r + s_index) / fs
-
-        # T vlna je maximum v posledných 100 ms segmentu
-        t_index = np.argmax(segment[100:])
-        t_time = (r + 100 + t_index) / fs
-
-        pq_intervals.append(q_time - (r - 50) / fs)
-        qrs_durations.append(s_time - q_time)
-        qt_intervals.append(t_time - q_time)
-        st_intervals.append(t_time - s_time)
-
-    return np.array(pq_intervals), np.array(qrs_durations), np.array(qt_intervals), np.array(st_intervals)
-
-def extract_derivative_features(segments):
-    """Extrahuje maximálnu strmosť QRS komplexu."""
-    diff_segments = np.diff(segments, axis=1)
-    max_slope = np.max(diff_segments, axis=1)  # Maximálna derivácia
-
-    return max_slope
-
-    """Extrahuje všetky relevantné príznaky z EKG segmentov pre fuzzy klasifikáciu."""
-    # Segmentácia srdcových úderov
-    segments = segment_heartbeats(filtered_signal, detected_r_peaks, fs)
-
-    # RR intervaly a HRV metriky
-    rr_previous, rr_next, sdnn, rmssd, lf_hf_ratio = extract_rr_features(detected_r_peaks, fs)
-
-    # Amplitúdy vĺn
-    r_amplitudes, p_amplitudes, t_amplitudes = extract_wave_amplitudes(segments)
-
-    # Časové intervaly medzi vlnami
-    pq_intervals, qrs_durations, qt_intervals, st_intervals = extract_wave_durations(detected_r_peaks, fs)
-
-    # Derivačné príznaky
-    max_slope = extract_derivative_features(segments)
-
-    # Uloženie príznakov do slovníka
-    features = {
-        "RR₀": rr_previous,
-        "RR₁": rr_next,
-        "SDNN": sdnn,
-        "RMSSD": rmssd,
-        "LF/HF Ratio": lf_hf_ratio,
-        "R Amplitude": r_amplitudes,
-        "P Amplitude": p_amplitudes,
-        "T Amplitude": t_amplitudes,
-        "PQ Interval": pq_intervals,
-        "QRS Duration": qrs_durations,
-        "QT Interval": qt_intervals,
-        "ST Interval": st_intervals,
-        "Max Slope": max_slope
-    }
-
-    return features
-def extract_ecg_features(filtered_signal, detected_r_peaks, fs, segments):
-    """Extrahuje všetky relevantné príznaky z EKG segmentov pre fuzzy klasifikáciu."""
-    # Segmentácia srdcových úderov
-
-
-    # RR intervaly a HRV metriky
-    rr_previous, rr_next, sdnn, rmssd, lf_hf_ratio = extract_rr_features(detected_r_peaks, fs)
-
-    # Amplitúdy vĺn
-    r_amplitudes, p_amplitudes, t_amplitudes = extract_wave_amplitudes(segments)
-    # Oprava veľkosti detegovaných R-peakov
-    if len(detected_r_peaks) > len(segments):
-        detected_r_peaks = detected_r_peaks[:len(segments)]
-    # Časové intervaly medzi vlnami (opravené)
-    pq_intervals, qrs_durations, qt_intervals, st_intervals = extract_wave_durations(detected_r_peaks, segments, fs)
-
-    # Derivačné príznaky
-    max_slope = extract_derivative_features(segments)
-
-    # Vytvorenie slovníka príznakov
-    features = {
-        "RR₀": np.array(rr_previous),
-        "RR₁": np.array(rr_next),
-        "SDNN": np.array([sdnn]),  # Konvertované na pole
-        "RMSSD": np.array([rmssd]),  # Konvertované na pole
-        "LF/HF Ratio": np.array([lf_hf_ratio]),  # Konvertované na pole
-        "R Amplitude": np.array(r_amplitudes),
-        "P Amplitude": np.array(p_amplitudes),
-        "T Amplitude": np.array(t_amplitudes),
-        "PQ Interval": np.array(pq_intervals),
-        "QRS Duration": np.array(qrs_durations),
-        "QT Interval": np.array(qt_intervals),
-        "ST Interval": np.array(st_intervals),
-        "Max Slope": np.array(max_slope)
-    }
-
-    return features
-
-def plot_segment_with_all_waves(segment, fs, r_amplitude, pq_interval, qrs_duration, p_amplitude, t_amplitude):
-    """
-    Vizualizuje jeden segment EKG so zaznačenými vlnami P, Q, R, S, T na základe extrahovaných časových príznakov.
-
-    Parametre:
-    - segment: Pole so vzorkami segmentu
-    - fs: Vzorkovacia frekvencia EKG signálu
-    - r_amplitude: Amplitúda R-vlny zo slovníka extrahovaných príznakov
-    - pq_interval: Čas PQ intervalu v sekundách (na výpočet polohy Q vlny)
-    - qrs_duration: Trvanie QRS komplexu v sekundách (na výpočet polohy S vlny)
-    - p_amplitude: Amplitúda P-vlny zo slovníka extrahovaných príznakov
-    - t_amplitude: Amplitúda T-vlny zo slovníka extrahovaných príznakov
-    """
-
-    time_axis = np.arange(len(segment)) / fs
-
-    # Nájdeme R-peak ako najvyšší bod v segmente
-    r_peak_index = np.argmax(segment)
-
-    # Výpočet indexov Q a S na základe extrahovaných časových intervalov
-    q_index = int(r_peak_index - (pq_interval * fs))  # Q vlna pred R-vlnou
-    s_index = int(r_peak_index + (qrs_duration * fs))  # S vlna po R-vlne
-
-    # P-vlna: Hľadáme lokálne maximum v PQ intervale
-    p_search_range = max(0, q_index - int(0.1 * fs))
-    p_index = np.argmax(segment[p_search_range:q_index]) + p_search_range
-
-    # T-vlna: Hľadáme lokálne maximum v ST intervale
-    t_search_range = min(len(segment), s_index + int(0.1 * fs))
-    t_index = np.argmax(segment[s_index:t_search_range]) + s_index
-
-    # Kontrola hraníc indexov
-    q_index = max(0, q_index)
-    s_index = min(len(segment) - 1, s_index)
-    p_index = max(0, p_index)
-    t_index = min(len(segment) - 1, t_index)
-
-    # Vizualizácia segmentu
-    plt.figure(figsize=(10, 5))
-    plt.plot(time_axis, segment, label="ECG Segment", linewidth=2)
-
-    # Označenie vĺn
-    plt.scatter(time_axis[r_peak_index], r_amplitude, color='red', label="R-wave", zorder=3)
-    plt.scatter(time_axis[q_index], segment[q_index], color='purple', label="Q-wave (z PQ Interval)", zorder=3)
-    plt.scatter(time_axis[s_index], segment[s_index], color='blue', label="S-wave (z QRS Duration)", zorder=3)
-    plt.scatter(time_axis[p_index], p_amplitude, color='orange', label="P-wave (presná poloha)", zorder=3)
-    plt.scatter(time_axis[t_index], t_amplitude, color='green', label="T-wave (presná poloha)", zorder=3)
-
-    # Nastavenia grafu
-    plt.xlabel("Time (s)")
-    plt.ylabel("Amplitude")
-    plt.title("Segment EKG so zaznačenými P, Q, R, S, T vlnami (presné použitie príznakov)")
-    plt.legend()
-    plt.grid()
-    plt.show()
 # 4️⃣ Main Execution
 if __name__ == "__main__":
     #filter_and_validate_signal()
     #detect_r_peaks_on_filtered_signal()
     #process_ecg(record_name="100", path="./mit/", duration=5)
     #process_ecg_with_comparison(record_name="100", path="./mit/", duration=5, tolerance=50)
-    #process_ecg_with_segmentation(record_name="100", path="./mit/", duration=5)
-    record_name = "100"
-    path = "./mit/"
-    raw_signal, fs, _, _ = load_mitbih_record(record_name, path)
+    raw_signal, fs, annotated_r_peaks, _ = load_mitbih_record(record_name="100", path="../data/mit/")
+    print(f"Anotovane R peaky: {annotated_r_peaks}")
+    print(f"Pocet Anotovane R peaky: {len(annotated_r_peaks)}")
 
-    # 1. Odstránenie vysokofrekvenčného šumu
+    # 1. Odstránime vysokofrekvenčný šum
     filtered_signal = lowpass_filter(raw_signal, fs, cutoff=40)
 
-    # 2. Odstránenie baseline driftu pomocou DWT
+    # 2. Odstránime baseline drift pomocou DWT
     filtered_signal = dwt_filtering(filtered_signal, threshold_factor=0.15)
 
     # 3. Z-score normalizácia
     raw_signal = normalize_zscore(raw_signal)
     filtered_signal = normalize_zscore(filtered_signal)
-
     # 4. Pan-Tompkins metóda na zvýraznenie QRS komplexov
     diff_signal = differentiate(filtered_signal)
     squared_signal = squaring(diff_signal)
-    integrated_signal = moving_window_integration(squared_signal, window_size=10)
-
     # 5. Detekcia R-peakov
+    integrated_signal = moving_window_integration(squared_signal, window_size=10)
     detected_r_peaks = detect_r_peaks(integrated_signal, fs, threshold_factor=0.35)
-    print(f"detected_r_peaks: {detected_r_peaks}")
-    segments = segment_heartbeats(filtered_signal, detected_r_peaks, fs)
+
+
+
+
     # 6. Segmentácia EKG signálu na údery
-    features = extract_ecg_features(filtered_signal, detected_r_peaks, fs, segments)
-    print(f"features: {features}")
-    # 7. Výpis príznakov
-    for key, value in features.items():
-        if isinstance(value, (np.ndarray, list)):  # Ak je pole, vypíš prvých 5 hodnôt
-            print(f"{key}: {value[:5]} ...")
-        else:  # Ak je to skalár, vypíš hodnotu priamo
-            print(f"{key}: {value}") # Vypíšeme len prvých 5 hodnôt pre prehľadnosť
+    segments = segment_heartbeats(filtered_signal, detected_r_peaks, fs)
+    delineated = nk.ecg_delineate(filtered_signal, sampling_rate=360, method="dwt")
+    print(delineated['P_Peaks'])
+    print(delineated['T_Peaks'])
+    print(delineated['P_Onsets'])
+    print(delineated['T_Offsets'])
 
-    if len(segments) > 0:
-        first_segment = segments[0]  # Prvý segment
-
-        # Načítanie príznakov z extrakcie
-        r_amplitude = features["R Amplitude"][0]
-        pq_interval = features["PQ Interval"][0]
-        qrs_duration = features["QRS Duration"][0]
-        p_amplitude = features["P Amplitude"][0]
-        t_amplitude = features["T Amplitude"][0]
-
-        # Vizualizácia segmentu s P, Q, R, S, T vlnami
-        plot_segment_with_all_waves(first_segment, fs, r_amplitude, pq_interval, qrs_duration, p_amplitude, t_amplitude)
-    else:
-        print("❌ Neboli nájdené žiadne segmenty!")

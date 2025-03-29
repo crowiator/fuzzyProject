@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="com.obiscr.chatgpt.settings.EasyCodeState">
+    <option name="projectFiles" value="$PROJECT_DIR$/mit/mitdbdir/src/dbnotes-html.c;/Users/crow/PycharmProjects/fuzzyProject/mit/mitdbdir/src/dbnotes.c;/Users/crow/PycharmProjects/fuzzyProject/mit/mitdbdir/src/dbtab.c;/Users/crow/PycharmProjects/fuzzyProject/mit/mitdbdir/src/notes.h;/Users/crow/PycharmProjects/fuzzyProject/preproccesing/butterFilter-Lms.py;/Users/crow/PycharmProjects/fuzzyProject/preproccesing/remove_noise.py;/Users/crow/PycharmProjects/fuzzyProject/extrakcia.py;/Users/crow/PycharmProjects/fuzzyProject/fuzzy.py;/Users/crow/PycharmProjects/fuzzyProject/fuzzy_classifier.py;/Users/crow/PycharmProjects/fuzzyProject/main.py;/Users/crow/PycharmProjects/fuzzyProject/main_new.py;/Users/crow/PycharmProjects/fuzzyProject/ml.py;/Users/crow/PycharmProjects/fuzzyProject/models.py;/Users/crow/PycharmProjects/fuzzyProject/skusam.py" />
+  </component>
+</project>
