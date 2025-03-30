@@ -1,14 +1,14 @@
 # preprocessing/load.py
 import wfdb
 from collections import Counter
-
+from config import MIT_DATA_PATH
 EXCLUDED_ANNOTATIONS = {
     "+", "~", "|", "Q", "/", "f", "x", "\""
 }
 
 
 
-def load_mitbih_record(record_name, path="./data/mit/"):
+def load_mitbih_record(record_name,  path=str(MIT_DATA_PATH) + "/"):
     """
     Načíta EKG záznam z MIT-BIH databázy a vráti len validné údery na základe anotácií.
 
@@ -25,7 +25,7 @@ def load_mitbih_record(record_name, path="./data/mit/"):
         annotation = wfdb.rdann(f"{path}{record_name}", 'atr')
         fs = record.fs
         leads = record.sig_name
-        print(record.units)
+        #print(record.units)
 
         # Načítanie signálu z prvého kanála
         if hasattr(record, "p_signal") and record.p_signal is not None:

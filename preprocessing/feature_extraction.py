@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pywt
 import neurokit2 as nk
-
+from config import QRS_COMPARISON_CSV
 def extract_features_for_fuzzy(signal_for_amplitude, fs, r_peaks):
 
     try:
@@ -36,10 +36,10 @@ def extract_features_for_fuzzy(signal_for_amplitude, fs, r_peaks):
             if 30 <= hr <= 220:
                 valid_hr = hr
             else:
-                print(f"⚠️ VYHODENÝ HR: {hr:.1f} bpm @ beat {i}")
+               # print(f"⚠️ VYHODENÝ HR: {hr:.1f} bpm @ beat {i}")
                 continue
         else:
-            print(f"⚠️ Chybný RR interval @ beat {i}")
+            #print(f"⚠️ Chybný RR interval @ beat {i}")
             continue
 
 
@@ -54,7 +54,7 @@ def extract_features_for_fuzzy(signal_for_amplitude, fs, r_peaks):
                 valid_qrs = np.nan
             # ⛔ Skip ak je QRS nerealistický alebo chýba
             if np.isnan(valid_qrs):
-                print(f"⏭️ Preskakujem beat {i} – žiadny spoľahlivý QRS interval")
+               # print(f"⏭️ Preskakujem beat {i} – žiadny spoľahlivý QRS interval")
                 continue
         else:
             valid_qrs = np.nan
@@ -63,14 +63,14 @@ def extract_features_for_fuzzy(signal_for_amplitude, fs, r_peaks):
         search_start = r + int(0.15 * fs)
         search_end = r + int(0.4 * fs)
         if search_end >= len(reconstructed) or (i + 1 < len(r_peaks) and search_end > r_peaks[i + 1]):
-            print(f"⚠️ TWA_window mimo rozsah @ beat {i}")
+           # print(f"⚠️ TWA_window mimo rozsah @ beat {i}")
             continue
 
         twa_wavelet = max(np.abs(reconstructed[search_start:search_end]))
        # print(f"🔍 Beat {i}: TWA_orig = {twa_orig:.3f} mV, TWA_wavelet = {twa_wavelet:.3f} mV")
 
         if not 0 < twa_wavelet <=1.0:
-            print(f"⚠️ Nevalidná TWA_wavelet @ beat {i}: {twa_wavelet:.3f} mV")
+           # print(f"⚠️ Nevalidná TWA_wavelet @ beat {i}: {twa_wavelet:.3f} mV")
             continue
 
         # ⬇️ Ukladanie
@@ -89,10 +89,11 @@ def extract_features_for_fuzzy(signal_for_amplitude, fs, r_peaks):
             "T_wave": float(twa_wavelet)
         })
 
-        #print(f"→ Beat {i}: HR={hr:.1f} bpm, QRS={valid_qrs:.1f} ms, TWA={final_twa:.3f} mV ({twa_source})")
+        
 
         # Export
     df_cmp = pd.DataFrame(comparison_log)
-    df_cmp.to_csv("results/reports/qrs_comparison.csv", index=False)
+    QRS_COMPARISON_CSV.parent.mkdir(parents=True, exist_ok=True)
+    df_cmp.to_csv(QRS_COMPARISON_CSV, index=False)
     print("✅ Porovnanie QRS + TWA uložené do results/reports/qrs_comparison.csv")
     return features

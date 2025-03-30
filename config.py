@@ -1,5 +1,5 @@
 # config.py – Globálne nastavenia projektu
-
+from pathlib import Path
 # Cesta k dátam
 DATA_PATH = "./data/mit/"
 
@@ -34,3 +34,18 @@ TEST_SIZE = 0.2
 
 # Random seed (pre reprodukovateľnosť)
 RANDOM_STATE = 42
+
+
+
+# Hlavný priečinok projektu
+BASE_DIR = Path(__file__).resolve().parent
+MIT_DATA_PATH = BASE_DIR / "data" / "mit"
+RESULTS_DIR = BASE_DIR / "results"
+REPORTS_DIR = RESULTS_DIR / "reports"
+DATA_CACHE_DIR = RESULTS_DIR / "data"
+
+# Cache súbory
+FUZZY_FEATURE_CACHE = DATA_CACHE_DIR / "fuzzy_feature_cache.npz"
+CNN_SEGMENT_CACHE = DATA_CACHE_DIR / "cnn_segments_fuzzy.npz"
+CNN_RESULTS_CSV = REPORTS_DIR / "cnn_vs_hybrid_comparison.csv"
+QRS_COMPARISON_CSV = REPORTS_DIR / "qrs_comparison.csv"
