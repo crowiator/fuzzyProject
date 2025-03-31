@@ -8,7 +8,7 @@ from tensorflow.keras.callbacks import EarlyStopping
 from classifiers.cnn import build_1d_cnn, build_1d_cnn_with_fuzzy
 from preprocessing.prepare_shared_cnn_dataset import prepare_shared_cnn_dataset
 from config import REPORTS_DIR
-def cross_validate_model(model_fn, X, y, model_name="Model", cv=5, export_path=None):
+def cross_validate_model(model_fn, X, y, model_name="Model", cv=10, export_path=None):
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
     all_reports = []
 
@@ -55,7 +55,7 @@ def cross_validate_model(model_fn, X, y, model_name="Model", cv=5, export_path=N
 
     return avg_report
 
-def cross_validate_cnn_models(cv=5):
+def cross_validate_cnn_models(cv=10):
     print(f"\n🔁 Spúšťam {cv}-fold cross-validáciu pre klasickú a hybridnú CNN...")
 
     # Načítaj dáta
