@@ -271,7 +271,7 @@ if __name__ == "__main__":
     run_hybrid_models(df_hybrid)
 
     print("\n--- Running traditional models ---")
-    #run_classical_algorithm(df_hybrid)
+    run_classical_algorithm(df_hybrid)
     # run_fuzzy_classificator()
     # fuzzy_classificator_statistic()
     # find_invalid_features()
