@@ -1,250 +1,277 @@
-import wfdb
-import numpy as np
+import seaborn as sns
+from matplotlib import pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
 import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
-from scipy.signal import butter, filtfilt
-import pywt
-import neurokit2 as nk
+
+matplotlib.use('TkAgg')
+
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from imblearn.over_sampling import SMOTE
+from classifiers.fuzzy_classifier import FuzzyClassifier
+from classifiers.traditional_models import (
+    train_knn,
+    train_svm,
+    train_decision_tree,
+    train_random_forest,
+    evaluate_model,
+)
+from sklearn.model_selection import cross_val_score
+
 import pandas as pd
-# 1️⃣ Funkcia na načítanie EKG signálu a anotácií
-def load_mitbih_record(record_name, path="./mit/"):
-    """Načíta EKG signál a anotácie z MIT-BIH databázy."""
-    try:
-        record = wfdb.rdrecord(f"{path}{record_name}")
-        annotation = wfdb.rdann(f"{path}{record_name}", 'atr')
-        fs = record.fs
-        signal = record.p_signal[:, 0]
-
-        # Extrahujeme R-peaky a kategórie tepov
-        r_peak_positions = annotation.sample
-        beat_types = annotation.symbol
-
-        return signal, fs, r_peak_positions, beat_types
-    except Exception as e:
-        print(f"❌ Chyba pri načítaní záznamu {record_name}: {e}")
-        return None, None, None, None
-
-# 2️⃣ Funkcia na odstránenie baseline driftu (Butterworth High-Pass Filter)
-def butter_highpass(signal, cutoff=0.5, fs=360, order=4):
-    """Aplikuje Butterworth High-Pass Filter na EKG signál."""
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='high', analog=False)
-    filtered_signal = filtfilt(b, a, signal)
-    return filtered_signal
+from preprocessing.load import summarize_loaded_beat_counts
+from preprocessing.fuzzy_feature_loader import load_or_extract_fuzzy_features
 
 
-def wavelet_denoising(signal, wavelet='db4', level=4):
-    coeffs = pywt.wavedec(signal, wavelet, level=level)
-    threshold = np.median(np.abs(coeffs[-level])) / 0.6745
-    coeffs_thresholded = [pywt.threshold(c, threshold, mode='soft') for c in coeffs]
-    denoised_signal = pywt.waverec(coeffs_thresholded, wavelet)
+def run_fuzzy_classificator():
+    features, labels, beat_counts = load_or_extract_fuzzy_features()
+    fuzzy_classifier = FuzzyClassifier()  # ✅ správne umiestnenie!
 
-    # Kontrola dĺžky
-    if len(denoised_signal) > len(signal):
-        denoised_signal = denoised_signal[:len(signal)]
-    elif len(denoised_signal) < len(signal):
-        denoised_signal = np.pad(denoised_signal, (0, len(signal) - len(denoised_signal)), 'constant')
+    results = []
 
-    return denoised_signal
+    for feature, label in zip(features, labels):
+        hr = feature["HR"]
+        qrs = feature["QRS_interval"]
+        twa = feature["T_wave"]
 
-# 3️⃣ Funkcia na vykreslenie porovnania surového a filtrovaného signálu
-def compare_signals(filtered_signal, denoised_signal, r_peaks, record_name, num_samples=1000):
-    plt.figure(figsize=(12, 5))
+        try:
+            fuzzy_score, fuzzy_label, memberships = fuzzy_classifier.predict(hr, qrs, twa)
+        except Exception as e:
+            print(f"Chyba klasifikácie úderu: HR={hr}, QRS={qrs}, TWA={twa} → {e}")
+            fuzzy_score, fuzzy_label, memberships = (None, "Error", {"normal": 0, "moderate": 0, "severe": 0})
 
-    # 🔹 1. Graf - Butterworth filter (baseline drift odstránený)
-    plt.subplot(1, 2, 1)
-    plt.plot(filtered_signal[:num_samples], label="Po Butterworth filtre", color="b")
-    plt.scatter(r_peaks[r_peaks < num_samples], filtered_signal[r_peaks[r_peaks < num_samples]], color="r", marker='o', label="R-peaky")
-    plt.xlabel("Vzorky")
-    plt.ylabel("Amplitúda")
-    plt.title(f"EKG po Butterworth filtre - {record_name}")
-    plt.legend()
+        results.append({
+            "HR": hr,
+            "QRS_interval": qrs,
+            "T_wave": twa,
+            "True_Label": label,
+            "Fuzzy_Score": fuzzy_score,
+            "Fuzzy_Label": fuzzy_label,
+            "Membership_Normal": memberships["normal"],
+            "Membership_Moderate": memberships["moderate"],
+            "Membership_Severe": memberships["severe"]
+        })
 
-    # 🔹 2. Graf - Po Waveletovej filtrácii (DWT)
-    plt.subplot(1, 2, 2)
-    plt.plot(denoised_signal[:num_samples], label="Po DWT filtrácii", color="g")
-    plt.scatter(r_peaks[r_peaks < num_samples], denoised_signal[r_peaks[r_peaks < num_samples]], color="r", marker='o', label="R-peaky")
-    plt.xlabel("Vzorky")
-    plt.ylabel("Amplitúda")
-    plt.title(f"EKG po Wavelet filtrácii (DWT) - {record_name}")
-    plt.legend()
+    df_results = pd.DataFrame(results)
+    df_results.to_csv("results/fuzzy_classification_results.csv", index=False)
 
-    plt.tight_layout()
+    print("Fuzzy classification complete. Results saved to 'results/fuzzy_classification_results.csv'.")
+
+    summarize_loaded_beat_counts(beat_counts)
+
+
+def fuzzy_classificator_statistic():
+    file_path = 'results/fuzzy_classification_results.csv'
+
+    df = pd.read_csv(file_path)
+    df_valid = df[df["Fuzzy_Label"] != "Invalid"]
+
+    print("Total number of beats:", len(df))
+    print("Počet validných úderov použitých v analýze:", len(df_valid))
+
+    print("\nDistribution by fuzzy classifier:")
+    print(df_valid["Fuzzy_Label"].value_counts())
+    print("\nDistribution by true annotations:")
+    print(df_valid["True_Label"].value_counts())
+
+    print("\nAverage feature values (valid only):")
+    print(f"- Average HR: {df_valid['HR'].mean():.2f} bpm")
+    print(f"- Average QRS interval: {df_valid['QRS_interval'].mean():.2f} ms")
+    print(f"- Average T-wave amplitude: {df_valid['T_wave'].mean():.3f} mV")
+
+    cm = confusion_matrix(
+        df_valid["True_Label"],
+        df_valid["Fuzzy_Label"],
+        labels=["Normal", "Moderate", "Severe"]
+    )
+
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Normal", "Moderate", "Severe"])
+    disp.plot(cmap="Blues")
+    plt.title("Confusion Matrix pre Fuzzy Klasifikátor")
     plt.show()
 
-# Funkcia na detekciu R-vĺn pomocou Pan-Tompkins algoritmu (NeuroKit2)
-def detect_r_peaks(signal, fs):
+    report = classification_report(
+        df_valid["True_Label"],
+        df_valid["Fuzzy_Label"],
+        labels=["Normal", "Moderate", "Severe"],
+        target_names=["Normal", "Moderate", "Severe"]
+    )
+
+    print(report)
+
+
+def find_invalid_features():
+    file_path = 'results/fuzzy_classification_results.csv'
+    df = pd.read_csv(file_path)
+
+    invalid_cases = df[df["Fuzzy_Label"] == "Invalid"]
+    print(f"Total invalid cases: {len(invalid_cases)}\n")
+
+    invalid_hr = invalid_cases[(invalid_cases["HR"] < 40) | (invalid_cases["HR"] > 120)]
+    print(f"Invalid HR cases: {len(invalid_hr)} ({len(invalid_hr) / len(invalid_cases) * 100:.2f}%)")
+
+    invalid_qrs = invalid_cases[(invalid_cases["QRS_interval"] < 50) | (invalid_cases["QRS_interval"] > 120)]
+    print(f"Invalid QRS_interval cases: {len(invalid_qrs)} ({len(invalid_qrs) / len(invalid_cases) * 100:.2f}%)")
+
+    invalid_twa = invalid_cases[(invalid_cases["T_wave"] <= 0.0) | (invalid_cases["T_wave"] > 0.6)]
+    print(f"Invalid T_wave cases: {len(invalid_twa)} ({len(invalid_twa) / len(invalid_cases) * 100:.2f}%)")
+
+
+def preparing_hybrid_features():
+    print("loading")
+    features, labels, beat_counts = load_or_extract_fuzzy_features()
+    df = pd.DataFrame(features)
+    df["Label"] = labels
+    fuzzy_classifier = FuzzyClassifier()
+
+    def extract_hybrid_features(row):
+        fuzzy_score, fuzzy_label, memberships = fuzzy_classifier.predict(
+            row["HR"], row["QRS_interval"], row["T_wave"]
+        )
+        return pd.Series({
+            "Fuzzy_Score": fuzzy_score,
+            "Fuzzy_μ_Normal": memberships["normal"],
+            "Fuzzy_μ_Moderate": memberships["moderate"],
+            "Fuzzy_μ_Severe": memberships["severe"],
+            "Fuzzy_Label": fuzzy_label
+        })
+
+    hybrid_features = df.apply(extract_hybrid_features, axis=1)
+    df_hybrid = pd.concat([df, hybrid_features], axis=1)
+    df_hybrid = df_hybrid.dropna(subset=["Fuzzy_Score"])
+    df_hybrid = df_hybrid[df_hybrid["Fuzzy_Label"] != "Invalid"]
+    print("done")
+    # Spoločné filtrovanie pre oba typy modelov
+    df_filtered = df_hybrid.dropna(subset=["Fuzzy_Score"])
+    df_filtered = df_filtered[df_filtered["Fuzzy_Label"] != "Invalid"]
+    print(df_hybrid)
+    print(df_filtered)
+    return df_hybrid
+
+
+def run_classical_algorithm(df):
+    TEST_SIZE = 0.2
+    RANDOM_STATE = 42
+    CV_FOLDS = 5
+    df = df.dropna(subset=["HR", "QRS_interval", "T_wave", "Label"])
+    X = df[["HR", "QRS_interval", "T_wave"]].values
+    y = df["Label"].values
+
+    X_resampled, y_resampled = SMOTE(random_state=RANDOM_STATE).fit_resample(X, y)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_resampled, y_resampled, test_size=TEST_SIZE, stratify=y_resampled, random_state=RANDOM_STATE
+    )
+
+    print("\n Decision Tree:")
+    dt_model = train_decision_tree(X_train, y_train, criterion='entropy', max_depth=None, max_features=None,
+                                   min_samples_leaf=1, min_samples_split=2)
+    evaluate_model(dt_model, X_test, y_test, save_path="results/reports/traditional/traditional", model_name="DecisionTree")
+    dt_scores = cross_val_score(dt_model, X_resampled, y_resampled, cv=CV_FOLDS)
+    print(f" Decision Tree cross-validation accuracy: {np.mean(dt_scores):.4f}")
+
+    print("\n Random Forest:")
+    rf_model = train_random_forest(X_train, y_train, criterion='entropy', max_depth=20, max_features=None,
+                                   min_samples_leaf=1, min_samples_split=5, n_estimators=150, )
+    evaluate_model(rf_model, X_test, y_test, save_path="results/reports/traditional/traditional", model_name="RandomForest")
+    rf_scores = cross_val_score(rf_model, X_resampled, y_resampled, cv=CV_FOLDS)
+    print(f" Random Forest cross-validation accuracy: {np.mean(rf_scores):.4f}")
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_resampled)
+    X_train_svm, X_test_svm, y_train_svm, y_test_svm = train_test_split(
+        X_scaled, y_resampled, test_size=TEST_SIZE, stratify=y_resampled, random_state=RANDOM_STATE
+    )
+    print("\n Support Vector Machine (SVM):")
+    svm_model = train_svm(X_train_svm, y_train_svm, C=10, degree=2, gamma='auto', kernel='rbf')
+    evaluate_model(svm_model, X_test_svm, y_test_svm, save_path="results/reports/traditional/traditional",
+                   model_name="SVM")
+    svm_scores = cross_val_score(svm_model, X_scaled, y_resampled, cv=CV_FOLDS)
+    print(f" SVM cross-validation accuracy: {np.mean(svm_scores):.4f}")
+
+    print("\n k-Nearest Neighbors (kNN):")
+    knn_model = train_knn(X_train_svm, y_train_svm, metric='manhattan', n_neighbors=5, weights='distance')
+    evaluate_model(knn_model, X_test_svm, y_test_svm, save_path="results/reports/traditional/traditional",
+                   model_name="kNN")
+    knn_scores = cross_val_score(knn_model, X_scaled, y_resampled, cv=CV_FOLDS)
+    print(f" kNN cross-validation accuracy: {np.mean(knn_scores):.4f}")
+
+
+def run_hybrid_models(df_hybrid):
+    TEST_SIZE = 0.2
+    RANDOM_STATE = 42
+    CV_FOLDS = 5
+
+    X = df_hybrid[[
+        "HR", "QRS_interval", "T_wave",
+        "Fuzzy_Score", "Fuzzy_μ_Normal", "Fuzzy_μ_Moderate", "Fuzzy_μ_Severe"
+    ]].values
+    y = df_hybrid["Label"].values
+
+    X_resampled, y_resampled = SMOTE(random_state=RANDOM_STATE).fit_resample(X, y)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_resampled, y_resampled, test_size=TEST_SIZE, stratify=y_resampled, random_state=RANDOM_STATE
+    )
     """
-    Vykoná detekciu R-vĺn v EKG signáli pomocou Pan-Tompkins algoritmu.
+    print("\n Hybrid Decision Tree:")
+    dt_model = train_decision_tree(X_train, y_train, criterion='entropy', max_depth=None, max_features=None,
+                                   min_samples_leaf=1, min_samples_split=2)
+    evaluate_model(dt_model, X_test, y_test, save_path="results/reports/hybrid/hybrid", model_name="DecisionTree")
+    dt_scores = cross_val_score(dt_model, X_resampled, y_resampled, cv=CV_FOLDS)
+    print(f" Hybrid Decision Tree cross-validation accuracy: {np.mean(dt_scores):.4f}")
 
-    Parametre:
-    signal (array): filtrovaný a odšumený EKG signál
-    fs (int): vzorkovacia frekvencia signálu
-
-    Výstup:
-    r_peaks (array): indexy detegovaných R-vĺn
-    processed_signals (DataFrame): signál so spracovaním (QRS komplexy, T/P vlny)
+    print("\n Hybrid Random Forest:")
+    rf_model = train_random_forest(X_train, y_train, criterion='entropy', max_depth=None, max_features=None,
+                                   min_samples_leaf=1, min_samples_split=2, n_estimators=200)
+    evaluate_model(rf_model, X_test, y_test, save_path="results/reports/hybrid/hybrid", model_name="RandomForest")
+    rf_scores = cross_val_score(rf_model, X_resampled, y_resampled, cv=CV_FOLDS)
+    print(f" Hybrid Random Forest cross-validation accuracy: {np.mean(rf_scores):.4f}")
     """
-    processed_signals, info = nk.ecg_process(signal, sampling_rate=fs)
-    r_peaks = info["ECG_R_Peaks"]
-    return r_peaks, processed_signals
 
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_resampled)
+    X_train_svm, X_test_svm, y_train_svm, y_test_svm = train_test_split(
+        X_scaled, y_resampled, test_size=TEST_SIZE, stratify=y_resampled, random_state=RANDOM_STATE
+    )
+    print("\n Hybrid Support Vector Machine (SVM):")
+    svm_model = train_svm(X_train_svm, y_train_svm, C=10, degree=2, gamma='auto', kernel='rbf')
+    evaluate_model(svm_model, X_test_svm, y_test_svm, save_path="results/reports/hybrid/hybrid",
+                   model_name="SVM")
+    svm_scores = cross_val_score(svm_model, X_scaled, y_resampled, cv=CV_FOLDS)
+    print(f" SVM cross-validation accuracy: {np.mean(svm_scores):.4f}")
 
-# Funkcia na vizualizáciu výsledkov detekcie R-vĺn
-def plot_detected_r_peaks(signal, r_peaks, fs, record_name, num_samples=2000):
     """
-    Vykreslí EKG signál s detegovanými R-vlnami.
-
-    Parametre:
-    signal (array): filtrovaný EKG signál
-    r_peaks (array): indexy detegovaných R-vĺn
-    fs (int): vzorkovacia frekvencia
-    record_name (str): názov EKG záznamu
-    num_samples (int): počet vzoriek na zobrazenie v grafe
-    """
-    plt.figure(figsize=(12, 4))
-
-    # Vykreslenie signálu
-    plt.plot(signal[:num_samples], label="Filtrovaný EKG signál", color="navy")
-
-    # Vykreslenie detegovaných R-vĺn
-    plt.scatter(r_peaks[r_peaks < num_samples],
-                signal[r_peaks[r_peaks < num_samples]],
-                color='red', marker='o', label="Detegované R-vlny")
-
-    plt.xlabel("Vzorky")
-    plt.ylabel("Amplitúda")
-    plt.title(f"EKG signál a detegované R-vlny (Pan-Tompkins) - {record_name}")
-    plt.legend()
-    plt.show()
-# Funkcia na vyhodnotenie presnosti detekcie voči MIT-BIH anotáciám
-def evaluate_detection(r_peaks_detected, r_peaks_true, tolerance=5):
-    """
-    Porovná detegované R-vlny s anotáciami z MIT-BIH databázy a vypočíta TP, FP, FN.
-
-    Parametre:
-    r_peaks_detected (array): detegované R-vlny
-    r_peaks_true (array): skutočné (anotované) R-vlny z databázy
-    tolerance (int): povolená odchýlka detekcie v počte vzoriek
-
-    Výstup:
-    Vypíše počet True Positives, False Positives a False Negatives
-    """
-    true_positives = sum([1 for peak in r_peaks_detected if any(abs(r_peaks_true - peak) <= tolerance)])
-    false_positives = len(r_peaks_detected) - true_positives
-    false_negatives = len(r_peaks_true) - true_positives
-
-    print(f"✔️ True Positives (TP): {true_positives}")
-    print(f"❌ False Positives (FP): {false_positives}")
-    print(f"❌ False Negatives (FN): {false_negatives}")
-
-    # Funkcia na segmentáciu EKG signálu
+    print("\n Hybrid k-Nearest Neighbors (kNN):")
+    knn_model = train_knn(X_train_svm, y_train_svm, metric='manhattan', n_neighbors=3, weights='distance')
+    evaluate_model(knn_model, X_test_svm, y_test_svm, save_path="results/reports/hybrid/hybrid", model_name="kNN")
+    knn_scores = cross_val_score(knn_model, X_scaled, y_resampled, cv=CV_FOLDS)
+    print(f" Hybrid kNN cross-validation accuracy: {np.mean(knn_scores):.4f}")
+     """
 
 
-def segment_ecg(signal, r_peaks, fs, pre_window=0.2, post_window=0.4):
-    """
-       Rozdelí EKG signál do segmentov (beats) na základe pozícií R-vĺn.
-
-       Parametre:
-       signal (array): filtrovaný EKG signál
-       r_peaks (array): indexy detegovaných R-vĺn
-       fs (int): vzorkovacia frekvencia
-       pre_window (float): čas v sekundách pred R-peakom
-       post_window (float): čas v sekundách po R-peaku
-
-       Výstup:
-       segments (list): zoznam segmentov (beats)
-       """
-    segments = []
-    pre_samples = int(pre_window * fs)  # vzorky pred R-peakom
-    post_samples = int(post_window * fs)  # vzorky po R-peaku
-
-    for r in r_peaks:
-        # Zaistíme, že segmenty nepresahujú hranice signálu
-        start = max(r - pre_samples, 0)
-        end = min(r + post_samples, len(signal))
-
-        # extrahujeme segment a pridáme do zoznamu
-        segment = signal[start:end]
-        segments.append(segment)
-
-    return segments
-
-    return segments
-
-
-# Funkcia na extrakciu príznakov zo segmentov EKG signálu
-def extract_features(segments, fs):
-    """
-    Extrahuje časové, frekvenčné a waveletové príznaky zo segmentov EKG signálov.
-
-    Parametre:
-    segments (list): zoznam EKG segmentov
-    fs (int): vzorkovacia frekvencia
-
-    Výstup:
-    features_list (list): zoznam slovníkov s príznakmi pre každý segment
-    """
-    features_list = []
-
-    for segment in segments:
-        features = {}
-
-        # Časové príznaky
-        features_r_amplitude = np.max(segment)
-        features_qrs_duration = np.ptp(segment)  # Peak-to-peak duration
-
-        # Frekvenčné príznaky (FFT)
-        freq_spectrum = np.abs(np.fft.fft(segment))[:len(segment)//2]
-        dominant_freq = np.argmax(freq_spectrum) * fs / len(segment)
-        fft_energy = np.sum(freq_spectrum**2)
-
-        # Waveletové príznaky (DWT)
-        coeffs = pywt.wavedec(segment, 'db4', level=4)
-        wavelet_energy = [np.sum(np.square(c)) for c in coeffs]
-
-        features = {
-            'R_amplitude': features_qrs_duration,
-            'QRS_duration': features_qrs_duration,
-            'Dominant_frequency': dominant_freq,
-            'FFT_energy': np.sum(freq_spectrum**2),
-            'Wavelet_energy_approx': wavelet_energy[0],
-            'Wavelet_energy_detail1': wavelet_energy[1],
-            'Wavelet_energy_detail2': wavelet_energy[1],
-            'Wavelet_energy_detail_level2': wavelet_energy[2],
-            'Wavelet_energy_detail_level3': wavelet_energy[3]
-        }
-
-        features_list.append(features)
-
-    return features_list
-
-# 4️⃣ Hlavná časť programu
+# Inicializácia
 if __name__ == "__main__":
-    record_name = "100"
-    raw_signal, fs, r_peaks_true, beat_types = load_mitbih_record(record_name)
+    print("\n--- Loading data for hybrid and traditional models ---")
+    df_hybrid = preparing_hybrid_features()
 
-    if raw_signal is not None:
-        # Odstránenie baseline driftu
-        # 1. Odstránenie baseline driftu
-        filtered_signal = butter_highpass(raw_signal, fs=fs)
+    # Count original and filtered data
+    total_original = len(load_or_extract_fuzzy_features()[0])
+    filtered_count = len(df_hybrid)
 
-        # 2. Odstránenie vysokofrekvenčného šumu pomocou DWT
-        denoised_signal = wavelet_denoising(signal=filtered_signal, wavelet='db4', level=4)
+    print("\nClass distribution after fuzzy filtering:")
+    print(df_hybrid["Label"].value_counts())
+    print(f"\nTotal original beats: {total_original}")
+    print(f"Beats used after fuzzy filtering: {filtered_count}")
+    print(f"Filtered out beats: {total_original - filtered_count} "
+          f"({(total_original - filtered_count) / total_original * 100:.2f}%)")
 
-        # Detekcia R-vĺn pomocou Pan-Tompkins algoritmu
-        r_peaks_detected, processed_signals = detect_r_peaks(denoised_signal, fs)
+    print("\n--- Running hybrid models ---")
+    run_hybrid_models(df_hybrid)
 
-        # Vizualizácia výsledkov
-        plot_detected_r_peaks(denoised_signal, r_peaks_detected, fs, record_name)
-        print("some tu")
-        # Segmentácia signálu
-        segments = segment_ecg(denoised_signal, r_peaks_detected, fs)
-        print(segments)
-        # Vyhodnotenie presnosti voči anotáciám
-        evaluate_detection(r_peaks_detected, r_peaks_true, tolerance=5)
-        # Extrakcia príznakov zo segmentov
-        print(extract_features(segments,fs))
-        #compare_signals(filtered_signal, denoised_signal, r_peaks, record_name)
+    print("\n--- Running traditional models ---")
+    #run_classical_algorithm(df_hybrid)
+    # run_fuzzy_classificator()
+    # fuzzy_classificator_statistic()
+    # find_invalid_features()

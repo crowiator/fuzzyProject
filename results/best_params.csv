@@ -1,0 +1,13 @@
+Model,Hybrid,Best Parameters
+SVM,False,"{'C': 10, 'degree': 2, 'gamma': 'auto', 'kernel': 'rbf'}"
+kNN,False,"{'metric': 'manhattan', 'n_neighbors': 5, 'weights': 'distance'}"
+SVM,True,"{'C': 10, 'degree': 2, 'gamma': 'auto', 'kernel': 'rbf'}"
+kNN,True,"{'metric': 'manhattan', 'n_neighbors': 3, 'weights': 'distance'}"
+Decision Tree,False,"{'criterion': 'entropy', 'max_depth': None, 'max_features': None, 'min_samples_leaf': 1, 'min_samples_split': 2}"
+Random Forest,False,"{'criterion': 'entropy', 'max_depth': 20, 'max_features': None, 'min_samples_leaf': 1, 'min_samples_split': 5, 'n_estimators': 150}"
+SVM,False,"{'C': 10, 'degree': 2, 'gamma': 'auto', 'kernel': 'rbf'}"
+kNN,False,"{'metric': 'manhattan', 'n_neighbors': 5, 'weights': 'distance'}"
+Decision Tree,True,"{'criterion': 'entropy', 'max_depth': None, 'max_features': None, 'min_samples_leaf': 1, 'min_samples_split': 2}"
+Random Forest,True,"{'criterion': 'entropy', 'max_depth': None, 'max_features': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 200}"
+SVM,True,"{'C': 10, 'degree': 2, 'gamma': 'auto', 'kernel': 'rbf'}"
+kNN,True,"{'metric': 'manhattan', 'n_neighbors': 3, 'weights': 'distance'}"

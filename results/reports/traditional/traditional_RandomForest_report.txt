@@ -1,0 +1,14 @@
+Classification Report – RandomForest
+========================================
+
+              precision    recall  f1-score   support
+
+    Moderate       0.82      0.79      0.81      2897
+      Normal       0.78      0.77      0.77      2897
+      Severe       0.84      0.89      0.86      2898
+
+    accuracy                           0.82      8692
+   macro avg       0.81      0.82      0.81      8692
+weighted avg       0.81      0.82      0.81      8692
+
+Accuracy: 0.8151
