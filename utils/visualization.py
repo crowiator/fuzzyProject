@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+import matplotlib
+matplotlib.use("TkAgg")
 
 def plot_fft_comparison(signal, filtered_signal, fs, record_id="unknown"):
     """

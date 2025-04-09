@@ -2,25 +2,23 @@
 import numpy as np
 
 ANNOTATION_TO_FUZZY = {
-    "N": "Normal",     # Normálny sínusový úder
+    "N": "Normal",  # normálny sínusový úder
 
-    # Moderate – bežné poruchy rytmu, bloky, extrasystoly
-    "L": "Moderate",   # Blokáda ľavého Tawarovho ramienka (LBBB)
-    "R": "Moderate",   # Blokáda pravého Tawarovho ramienka (RBBB)
-    "A": "Moderate",   # Predčasný predsieňový úder (APB)
-    "a": "Moderate",   # Aberantný predsieňový úder
-    "J": "Moderate",   # Junkčný predčasný úder
-    "S": "Moderate",   # Supraventrikulárny predčasný úder
-    "F": "Moderate",   # Fúzovaný úder (normálny + PVC)
-    "e": "Moderate",   # Predsieňový únikový úder
-    "j": "Moderate",   # Junkčný únikový úder
+    "L": "Moderate",  # LBBB môže indikovať závažnejší stav
+    "R": "Moderate",  # RBBB môže indikovať závažnejší stav
+    "e": "Moderate",  # predsieňový únikový úder môže indikovať poruchu
+    "j": "Moderate",  # junkčný únikový úder indikujúci poruchu vedenia
+    "A": "Moderate",  # predsieňový extrasystol (riziko fibrilácie predsiení)
+    "a": "Moderate",  # aberantný predsieňový extrasystol
+    "J": "Moderate",  # junkčný extrasystol
+    "S": "Moderate",  # supraventrikulárny extrasystol
+    "F": "Moderate",  # fúzny úder naznačuje komorovú ektopickú aktivitu
 
-    # Severe – potenciálne život ohrozujúce údery
-    "V": "Severe",     # Predčasný komorový úder (PVC)
-    "E": "Severe",     # Komorový únikový úder (idioventrikulárny)
-    "!": "Severe",     # Vlna komorového fluttera (súčasť VF)
-    "[": "Severe",     # Začiatok VF/flutter epizódy
-    "]": "Severe",     # Koniec VF/flutter epizódy
+    "V": "Severe",    # komorová extrasystola (potenciálne riziková)
+    "E": "Severe",    # komorový únikový úder (potenciálne rizikový)
+    "!": "Severe",    # flutter komôr (život ohrozujúci)
+    "[": "Severe",    # začiatok fibrilácie/flutteru komôr (život ohrozujúci)
+    "]": "Severe",    # koniec fibrilácie/flutteru komôr
 }
 
 def map_annotations_to_peaks(r_peaks, ann_samples, ann_symbols):

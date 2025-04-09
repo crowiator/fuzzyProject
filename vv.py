@@ -1,39 +1,53 @@
-import pandas as pd
+import numpy as np
+from preprocessing.load import load_mitbih_record
+from preprocessing.filtering import lowpass_filter, dwt_filtering
+from config import MIT_DATA_PATH
 import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
-import seaborn as sns
-matplotlib.use("TkAgg")
-# Načítaj CSV
-df = pd.read_csv("results/reports/qrs_comparison.csv")
+# Načítaj záznam
+record_name = '100'  # príklad záznamu, môžeš použiť aj iné
+signal, fs, _, _, _, _ = load_mitbih_record(record_name)
 
-# 1. 🧮 Percento výberu zdroja TWA
-source_counts = df["TWA_source"].value_counts(normalize=True) * 100
-print("📊 Percento použitia TWA zdroja:")
-print(source_counts.round(2))
+# Filtrácia
+signal_lowpass = lowpass_filter(signal, fs)
+signal_dwt = dwt_filtering(signal)
+signal_filtered = dwt_filtering(signal_lowpass)
 
-# 2. 📦 Rozdelenie rozdielov medzi orig a wavelet
-plt.figure(figsize=(10, 5))
-sns.histplot(df["abs_diff"], bins=30, kde=True, color="teal")
-plt.title("Rozdiel medzi TWA_orig a TWA_wavelet")
-plt.xlabel("Absolútny rozdiel (mV)")
-plt.ylabel("Počet úderov")
-plt.grid(True)
+# Časová os v sekundách
+duration = 5
+samples = int(duration *fs)
+time_axis = np.arange(samples)/fs
+# Vykreslenie grafov
+plt.figure(figsize=(14, 10))
+
+# Originálny signál
+plt.subplot(4, 1, 1)
+plt.plot(time_axis, signal [:samples], color='black')
+plt.title('Originálny EKG signál')
+plt.xlabel('Čas (s)')
+plt.ylabel('Amplitúda (mV)')
+
+# Po low-pass filtrácii
+plt.subplot(4, 1, 2)
+plt.plot(time_axis, signal_lowpass[:samples], color='blue')
+plt.title('EKG po low-pass filtrácii (Butterworth, 30 Hz)')
+plt.xlabel('Čas (s)')
+plt.ylabel('Amplitúda (mV)')
+
+# Po DWT filtrácii (baseline wander)
+plt.subplot(4, 1, 3)
+plt.plot(time_axis, signal_dwt[:samples], color='green')
+plt.title('EKG po DWT filtrácii (baseline wander removal)')
+plt.xlabel('Čas (s)')
+plt.ylabel('Amplitúda (mV)')
+
+# Kompletná filtrácia (low-pass + DWT)
+plt.subplot(4, 1, 4)
+plt.plot(time_axis, signal_filtered[:samples], color='red')
+plt.title('EKG po kompletnej filtrácii (Low-pass + DWT)')
+plt.xlabel('Čas (s)')
+plt.ylabel('Amplitúda (mV)')
+
 plt.tight_layout()
 plt.show()
-
-# 3. 📊 Boxplot rozdelenia podľa zdroja
-plt.figure(figsize=(8, 5))
-sns.boxplot(data=df, x="TWA_source", y="TWA_used", palette="pastel")
-plt.title("Rozdelenie TWA použitých hodnôt podľa zdroja")
-plt.ylabel("TWA (mV)")
-plt.xlabel("Zdroj")
-plt.grid(True)
-plt.tight_layout()
-plt.show()
-
-# 4. 🧹 Vyexportuj záznamy s veľkým rozdielom
-threshold = 0.3  # môžeš si nastaviť
-dirty = df[df["abs_diff"] > threshold]
-dirty.to_csv("results/reports/twa_conflict_cases.csv", index=False)
-print(f"🧼 Uložené {len(dirty)} 'špinavých' záznamov s rozdielom > {threshold} do twa_conflict_cases.csv")
