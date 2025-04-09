@@ -43,7 +43,7 @@ fuzzyProject/
 
 ## Požiadavky
 
-Projekt používa Python. Požadované balíčky nájdete v súbore `requirements.txt` (potrebné vytvoriť).
+Projekt používa Python. Požadované balíčky nájdete v súbore `requirements.txt`.
 
 ## Spustenie
 
