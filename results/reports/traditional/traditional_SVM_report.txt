@@ -1,0 +1,14 @@
+Classification Report – SVM
+========================================
+
+              precision    recall  f1-score   support
+
+    Moderate       0.72      0.68      0.70      2897
+      Normal       0.65      0.73      0.69      2897
+      Severe       0.69      0.64      0.67      2898
+
+    accuracy                           0.69      8692
+   macro avg       0.69      0.69      0.69      8692
+weighted avg       0.69      0.69      0.69      8692
+
+Accuracy: 0.6851

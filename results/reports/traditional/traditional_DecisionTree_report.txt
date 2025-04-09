@@ -1,0 +1,14 @@
+Classification Report – DecisionTree
+========================================
+
+              precision    recall  f1-score   support
+
+    Moderate       0.75      0.76      0.76      2897
+      Normal       0.72      0.72      0.72      2897
+      Severe       0.84      0.83      0.84      2898
+
+    accuracy                           0.77      8692
+   macro avg       0.77      0.77      0.77      8692
+weighted avg       0.77      0.77      0.77      8692
+
+Accuracy: 0.7725
