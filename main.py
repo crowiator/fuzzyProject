@@ -253,24 +253,51 @@ def run_hybrid_models(df_hybrid):
 
 # Inicializácia
 if __name__ == "__main__":
-    print("\n--- Loading data for hybrid and traditional models ---")
-    df_hybrid = preparing_hybrid_features()
+   def main():
+    print("Select mode:")
+    print("1 - Fuzzy-only classification")
+    print("2 - Classical ML algorithms")
+    print("3 - Hybrid fuzzy + classical models")
 
-    # Count original and filtered data
-    total_original = len(load_or_extract_fuzzy_features()[0])
-    filtered_count = len(df_hybrid)
+    choice = input("Enter your choice (1/2/3): ").strip()
 
-    print("\nClass distribution after fuzzy filtering:")
-    print(df_hybrid["Label"].value_counts())
-    print(f"\nTotal original beats: {total_original}")
-    print(f"Beats used after fuzzy filtering: {filtered_count}")
-    print(f"Filtered out beats: {total_original - filtered_count} "
-          f"({(total_original - filtered_count) / total_original * 100:.2f}%)")
+    if choice == "1":
+        run_fuzzy_classificator()
+        fuzzy_classificator_statistic()
+    elif choice == "2":
+        print("\n--- Loading data for hybrid and traditional models ---")
+        df_hybrid = preparing_hybrid_features()
 
-    print("\n--- Running hybrid models ---")
-    run_hybrid_models(df_hybrid)
+        # Count original and filtered data
+        total_original = len(load_or_extract_fuzzy_features()[0])
+        filtered_count = len(df_hybrid)
 
-    print("\n--- Running traditional models ---")
+        print("\nClass distribution after fuzzy filtering:")
+        print(df_hybrid["Label"].value_counts())
+        print(f"\nTotal original beats: {total_original}")
+        print(f"Beats used after fuzzy filtering: {filtered_count}")
+        print(f"Filtered out beats: {total_original - filtered_count} ")
+        print(f"({(total_original - filtered_count) / total_original * 100:.2f}%)")
+        run_classical_algorithm(df_hybrid)
+    elif choice == "3":
+        print("\n--- Loading data for hybrid and traditional models ---")
+        df_hybrid = preparing_hybrid_features()
+
+        # Count original and filtered data
+        total_original = len(load_or_extract_fuzzy_features()[0])
+        filtered_count = len(df_hybrid)
+
+        print("\nClass distribution after fuzzy filtering:")
+        print(df_hybrid["Label"].value_counts())
+        print(f"\nTotal original beats: {total_original}")
+        print(f"Beats used after fuzzy filtering: {filtered_count}")
+        print(f"Filtered out beats: {total_original - filtered_count} "
+              f"({(total_original - filtered_count) / total_original * 100:.2f}%)")
+
+        print("\n--- Running hybrid models ---")
+        run_hybrid_models(df_hybrid)
+    else:
+        print("Invalid choice.")
     #run_classical_algorithm(df_hybrid)
     # run_fuzzy_classificator()
     # fuzzy_classificator_statistic()
