@@ -2,11 +2,9 @@
 
 import wfdb
 from collections import Counter
-from config import MIT_DATA_PATH
+from config import MIT_DATA_PATH, FUZZY_FEATURE_CACHE, DATA_CACHE_DIR, FUZZY_FEATURE_CACHE_CAMFEA, RECORD_NAMES
 # Zoznam anotácií, ktoré nechceme zahrnúť do analýzy (napr. artefakty, chybné hodnoty)
-EXCLUDED_ANNOTATIONS = {
-    "+", "~", "|", "Q", "/", "f", "x", "\""
-}
+EXCLUDED_ANNOTATIONS = {"+", "~", "|"}
 
 """
 Táto funkcia načíta EKG signál a anotácie z MIT-BIH databázy pre daný záznam.
@@ -22,7 +20,7 @@ def load_mitbih_record(record_name,  path=str(MIT_DATA_PATH) + "/"):
     Načíta EKG záznam z MIT-BIH databázy a vráti len validné údery na základe anotácií.
 
     Vrátené:
-    - signal: 1D pole pôvodného EKG signálu (obsahuje aj nevalidné údery – nefiltruje sa)
+    - signal: 1D pole pôvodného EKG signálu
     - fs: vzorkovacia frekvencia
     - filtered_r_peak_positions: pozície R-vĺn platných úderov
     - filtered_beat_types: typy týchto úderov (napr. 'N', 'V', 'A', ...)
@@ -33,10 +31,8 @@ def load_mitbih_record(record_name,  path=str(MIT_DATA_PATH) + "/"):
         # Načítanie samotného EKG signálu a anotácií
         record = wfdb.rdrecord(f"{path}{record_name}")
         annotation = wfdb.rdann(f"{path}{record_name}", 'atr')
-        print(record)
-        print(f"annotation: {annotation}")
         fs = record.fs  # vzorkovacia frekvencia
-
+        print(record.sig_name)
         # Načítanie signálu z prvého kanála (ak existuje a nie je None)
         if hasattr(record, "p_signal") and record.p_signal is not None:
             if record.p_signal.ndim == 2:
@@ -60,7 +56,6 @@ def load_mitbih_record(record_name,  path=str(MIT_DATA_PATH) + "/"):
 
         # Spočítaj výskyt jednotlivých typov úderov
         beat_counts = Counter(filtered_beat_types)
-
         return signal, fs, filtered_r_peak_positions, filtered_beat_types, beat_counts, annotation
 
     # Chybové hlásenie, ak sa niečo nepodarí načítať
@@ -90,3 +85,13 @@ def summarize_loaded_beat_counts(all_beat_counts_by_record):
         print(f"Beat '{b_type}': {count} ocurrencies")
 
     return total_counter
+
+ # Spracovanie každého záznamu zo zoznamu RECORD_NAMES
+for record in RECORD_NAMES:
+    try:
+        # Načítanie EKG signálu, frekvencie vzorkovania, R-vĺn, anotácií a počtu úderov
+        signal, fs, r_peak_positions, beat_types, beat_counts, annotation = load_mitbih_record(
+                record_name=record, path=str(MIT_DATA_PATH) + "/")
+    except Exception as e:
+        # Ak nastane chyba, vypíšeme info o chybe, ale pokračujeme
+        print(f"Error processing record  {record}: {e}")

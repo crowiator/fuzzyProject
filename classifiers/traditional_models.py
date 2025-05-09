@@ -11,6 +11,7 @@ from sklearn.svm import SVC
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, ConfusionMatrixDisplay
 import pandas as pd
 
+# pre kla
 """
 Súbor traditional_models.py obsahuje funkcie, 
 ktoré umožňujú trénovanie a vyhodnotenie klasických metód strojového učenia

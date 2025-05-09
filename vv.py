@@ -1,53 +1,36 @@
-import numpy as np
-from preprocessing.load import load_mitbih_record
-from preprocessing.filtering import lowpass_filter, dwt_filtering
-from config import MIT_DATA_PATH
-import matplotlib
-matplotlib.use("TkAgg")
+# scripts/explore_centroids.py
+import pandas as pd
 import matplotlib.pyplot as plt
-# Načítaj záznam
-record_name = '100'  # príklad záznamu, môžeš použiť aj iné
-signal, fs, _, _, _, _ = load_mitbih_record(record_name)
+from pathlib import Path
+from config import OUT_DIR, ALL_RECORDS
+import matplotlib.pyplot as plt
+import matplotlib
+from config import ALL_RECORDS, LEAD, OUT_DIR, FEAT_DIR
 
-# Filtrácia
-signal_lowpass = lowpass_filter(signal, fs)
-signal_dwt = dwt_filtering(signal)
-signal_filtered = dwt_filtering(signal_lowpass)
+matplotlib.use('TkAgg')
+# 1) načítaj všetky uložené fuzzy CSV
+dfs = []
+for rec in ALL_RECORDS:
+    p = OUT_DIR / f"mitdb_{rec}_fuzzy_results.csv"
+    if p.is_file():
+        dfs.append(pd.read_csv(p).assign(Record=rec))
+df = pd.concat(dfs, ignore_index=True)
 
-# Časová os v sekundách
-duration = 5
-samples = int(duration *fs)
-time_axis = np.arange(samples)/fs
-# Vykreslenie grafov
-plt.figure(figsize=(14, 10))
+# 2) základné štatistiky centier podľa *skutočnej* triedy
+stats = (
+    df.groupby("TrueLabel")["Centroid"]
+      .agg(["count", "min", "median", "quantile"])
+)
+print(stats)
 
-# Originálny signál
-plt.subplot(4, 1, 1)
-plt.plot(time_axis, signal [:samples], color='black')
-plt.title('Originálny EKG signál')
-plt.xlabel('Čas (s)')
-plt.ylabel('Amplitúda (mV)')
+# 3) histogramy – uvidíš pretečenie do 'závažná'
+for lbl, sub in df.groupby("TrueLabel"):
+    plt.hist(sub["Centroid"], bins=50, alpha=.4, label=lbl, density=True)
+plt.axvline(0.25, c="k", ls="--", label="hr. mierna")
+plt.axvline(0.60, c="r", ls="--", label="hr. závažná")
+plt.legend(); plt.xlabel("Centroid"); plt.show()
 
-# Po low-pass filtrácii
-plt.subplot(4, 1, 2)
-plt.plot(time_axis, signal_lowpass[:samples], color='blue')
-plt.title('EKG po low-pass filtrácii (Butterworth, 30 Hz)')
-plt.xlabel('Čas (s)')
-plt.ylabel('Amplitúda (mV)')
-
-# Po DWT filtrácii (baseline wander)
-plt.subplot(4, 1, 3)
-plt.plot(time_axis, signal_dwt[:samples], color='green')
-plt.title('EKG po DWT filtrácii (baseline wander removal)')
-plt.xlabel('Čas (s)')
-plt.ylabel('Amplitúda (mV)')
-
-# Kompletná filtrácia (low-pass + DWT)
-plt.subplot(4, 1, 4)
-plt.plot(time_axis, signal_filtered[:samples], color='red')
-plt.title('EKG po kompletnej filtrácii (Low-pass + DWT)')
-plt.xlabel('Čas (s)')
-plt.ylabel('Amplitúda (mV)')
-
-plt.tight_layout()
-plt.show()
+# --- Detailné zobrazenie priebehov signálu bolo odstránené.
+# Ak chceš kresliť surový a filtrovaný signál, nahraj sem premenné
+# `time_axis`, `signal`, `signal_lowpass`, `signal_dwt`, `signal_filtered`
+# a definuj `samples`, potom zakóduj grafy podobne ako predtým.

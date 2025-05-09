@@ -2,9 +2,9 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
 import matplotlib
-
+from sklearn.metrics import precision_score, recall_score, f1_score
 matplotlib.use('TkAgg')
-
+import os
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -21,12 +21,12 @@ from sklearn.model_selection import cross_val_score
 
 import pandas as pd
 from preprocessing.load import summarize_loaded_beat_counts
-from preprocessing.fuzzy_feature_loader import load_or_extract_fuzzy_features
+from preprocessing.fuzzy_feature_loader import load_or_extract_fuzzy_features, load_or_extract_fuzzy_features2
 
 
 def run_fuzzy_classificator():
     features, labels, beat_counts = load_or_extract_fuzzy_features()
-    fuzzy_classifier = FuzzyClassifier()  # ✅ správne umiestnenie!
+    fuzzy_classifier = FuzzyClassifier()
 
     results = []
 
@@ -164,6 +164,11 @@ def run_classical_algorithm(df):
         X_resampled, y_resampled, test_size=TEST_SIZE, stratify=y_resampled, random_state=RANDOM_STATE
     )
 
+    accuracies = []
+    precisions = []
+    recalls = []
+    f1s = []
+
     print("\n Decision Tree:")
     dt_model = train_decision_tree(X_train, y_train, criterion='entropy', max_depth=None, max_features=None,
                                    min_samples_leaf=1, min_samples_split=2)
@@ -171,12 +176,33 @@ def run_classical_algorithm(df):
     dt_scores = cross_val_score(dt_model, X_resampled, y_resampled, cv=CV_FOLDS)
     print(f" Decision Tree cross-validation accuracy: {np.mean(dt_scores):.4f}")
 
+    y_pred_dt = dt_model.predict(X_test)
+    dt_precision = precision_score(y_test, y_pred_dt, average='weighted', zero_division=0)
+    dt_recall = recall_score(y_test, y_pred_dt, average='weighted', zero_division=0)
+    dt_f1 = f1_score(y_test, y_pred_dt, average='weighted', zero_division=0)
+    accuracies.append(np.mean(dt_scores))
+    precisions.append(dt_precision)
+    recalls.append(dt_recall)
+    f1s.append(dt_f1)
+
+
+
     print("\n Random Forest:")
     rf_model = train_random_forest(X_train, y_train, criterion='entropy', max_depth=20, max_features=None,
                                    min_samples_leaf=1, min_samples_split=5, n_estimators=150, )
     evaluate_model(rf_model, X_test, y_test, save_path="results/reports/traditional/traditional", model_name="RandomForest")
     rf_scores = cross_val_score(rf_model, X_resampled, y_resampled, cv=CV_FOLDS)
     print(f" Random Forest cross-validation accuracy: {np.mean(rf_scores):.4f}")
+
+    y_pred_rf = rf_model.predict(X_test)
+    rf_precision = precision_score(y_test, y_pred_rf, average='weighted', zero_division=0)
+    rf_recall = recall_score(y_test, y_pred_rf, average='weighted', zero_division=0)
+    rf_f1 = f1_score(y_test, y_pred_rf, average='weighted', zero_division=0)
+    accuracies.append(np.mean(rf_scores))
+    precisions.append(rf_precision)
+    recalls.append(rf_recall)
+    f1s.append(rf_f1)
+
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_resampled)
@@ -189,6 +215,14 @@ def run_classical_algorithm(df):
                    model_name="SVM")
     svm_scores = cross_val_score(svm_model, X_scaled, y_resampled, cv=CV_FOLDS)
     print(f" SVM cross-validation accuracy: {np.mean(svm_scores):.4f}")
+    y_pred_svm = svm_model.predict(X_test_svm)
+    svm_precision = precision_score(y_test_svm, y_pred_svm, average='weighted', zero_division=0)
+    svm_recall = recall_score(y_test_svm, y_pred_svm, average='weighted', zero_division=0)
+    svm_f1 = f1_score(y_test_svm, y_pred_svm, average='weighted', zero_division=0)
+    accuracies.append(np.mean(svm_scores))
+    precisions.append(svm_precision)
+    recalls.append(svm_recall)
+    f1s.append(svm_f1)
 
     print("\n k-Nearest Neighbors (kNN):")
     knn_model = train_knn(X_train_svm, y_train_svm, metric='manhattan', n_neighbors=5, weights='distance')
@@ -196,6 +230,17 @@ def run_classical_algorithm(df):
                    model_name="kNN")
     knn_scores = cross_val_score(knn_model, X_scaled, y_resampled, cv=CV_FOLDS)
     print(f" kNN cross-validation accuracy: {np.mean(knn_scores):.4f}")
+    y_pred_knn = knn_model.predict(X_test_svm)
+    knn_precision = precision_score(y_test_svm, y_pred_knn, average='weighted', zero_division=0)
+    knn_recall = recall_score(y_test_svm, y_pred_knn, average='weighted', zero_division=0)
+    knn_f1 = f1_score(y_test_svm, y_pred_knn, average='weighted', zero_division=0)
+    accuracies.append(np.mean(knn_scores))
+    precisions.append(knn_precision)
+    recalls.append(knn_recall)
+    f1s.append(knn_f1)
+    return accuracies, precisions, recalls, f1s
+
+
 
 
 def run_hybrid_models(df_hybrid):
@@ -214,13 +259,27 @@ def run_hybrid_models(df_hybrid):
     X_train, X_test, y_train, y_test = train_test_split(
         X_resampled, y_resampled, test_size=TEST_SIZE, stratify=y_resampled, random_state=RANDOM_STATE
     )
-    """
+
+    accuracies = []
+    precisions = []
+    recalls = []
+    f1s = []
+
     print("\n Hybrid Decision Tree:")
     dt_model = train_decision_tree(X_train, y_train, criterion='entropy', max_depth=None, max_features=None,
                                    min_samples_leaf=1, min_samples_split=2)
     evaluate_model(dt_model, X_test, y_test, save_path="results/reports/hybrid/hybrid", model_name="DecisionTree")
     dt_scores = cross_val_score(dt_model, X_resampled, y_resampled, cv=CV_FOLDS)
     print(f" Hybrid Decision Tree cross-validation accuracy: {np.mean(dt_scores):.4f}")
+    y_pred_dt = dt_model.predict(X_test)
+    dt_precision = precision_score(y_test, y_pred_dt, average='weighted', zero_division=0)
+    dt_recall = recall_score(y_test, y_pred_dt, average='weighted', zero_division=0)
+    dt_f1 = f1_score(y_test, y_pred_dt, average='weighted', zero_division=0)
+    accuracies.append(np.mean(dt_scores))
+    precisions.append(dt_precision)
+    recalls.append(dt_recall)
+    f1s.append(dt_f1)
+
 
     print("\n Hybrid Random Forest:")
     rf_model = train_random_forest(X_train, y_train, criterion='entropy', max_depth=None, max_features=None,
@@ -228,7 +287,15 @@ def run_hybrid_models(df_hybrid):
     evaluate_model(rf_model, X_test, y_test, save_path="results/reports/hybrid/hybrid", model_name="RandomForest")
     rf_scores = cross_val_score(rf_model, X_resampled, y_resampled, cv=CV_FOLDS)
     print(f" Hybrid Random Forest cross-validation accuracy: {np.mean(rf_scores):.4f}")
-    """
+    y_pred_rf = rf_model.predict(X_test)
+    rf_precision = precision_score(y_test, y_pred_rf, average='weighted', zero_division=0)
+    rf_recall = recall_score(y_test, y_pred_rf, average='weighted', zero_division=0)
+    rf_f1 = f1_score(y_test, y_pred_rf, average='weighted', zero_division=0)
+    accuracies.append(np.mean(rf_scores))
+    precisions.append(rf_precision)
+    recalls.append(rf_recall)
+    f1s.append(rf_f1)
+
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_resampled)
@@ -241,18 +308,107 @@ def run_hybrid_models(df_hybrid):
                    model_name="SVM")
     svm_scores = cross_val_score(svm_model, X_scaled, y_resampled, cv=CV_FOLDS)
     print(f" SVM cross-validation accuracy: {np.mean(svm_scores):.4f}")
+    y_pred_svm = svm_model.predict(X_test_svm)
+    svm_precision = precision_score(y_test_svm, y_pred_svm, average='weighted', zero_division=0)
+    svm_recall = recall_score(y_test_svm, y_pred_svm, average='weighted', zero_division=0)
+    svm_f1 = f1_score(y_test_svm, y_pred_svm, average='weighted', zero_division=0)
+    accuracies.append(np.mean(svm_scores))
+    precisions.append(svm_precision)
+    recalls.append(svm_recall)
+    f1s.append(svm_f1)
 
-    """
+
     print("\n Hybrid k-Nearest Neighbors (kNN):")
     knn_model = train_knn(X_train_svm, y_train_svm, metric='manhattan', n_neighbors=3, weights='distance')
     evaluate_model(knn_model, X_test_svm, y_test_svm, save_path="results/reports/hybrid/hybrid", model_name="kNN")
     knn_scores = cross_val_score(knn_model, X_scaled, y_resampled, cv=CV_FOLDS)
     print(f" Hybrid kNN cross-validation accuracy: {np.mean(knn_scores):.4f}")
-     """
+    y_pred_knn = knn_model.predict(X_test_svm)
+    knn_precision = precision_score(y_test_svm, y_pred_knn, average='weighted', zero_division=0)
+    knn_recall = recall_score(y_test_svm, y_pred_knn, average='weighted', zero_division=0)
+    knn_f1 = f1_score(y_test_svm, y_pred_knn, average='weighted', zero_division=0)
+    accuracies.append(np.mean(knn_scores))
+    precisions.append(knn_precision)
+    recalls.append(knn_recall)
+    f1s.append(knn_f1)
+
+    return accuracies, precisions, recalls, f1s
+
+
+
+
+def compare_models(
+    classical_results, hybrid_results,
+    classical_precision, hybrid_precision,
+    classical_recall, hybrid_recall,
+    classical_f1, hybrid_f1
+):
+    comparison = pd.DataFrame({
+        "Model": ["Decision Tree", "Random Forest", "SVM", "kNN"],
+        "Classical Accuracy": classical_results,
+        "Hybrid Accuracy": hybrid_results,
+        "Classical Precision": classical_precision,
+        "Hybrid Precision": hybrid_precision,
+        "Classical Recall": classical_recall,
+        "Hybrid Recall": hybrid_recall,
+        "Classical F1-Score": classical_f1,
+        "Hybrid F1-Score": hybrid_f1
+    })
+
+    print("\nComparison of models:")
+    print(comparison)
+
+    # Ensure directory exists
+    os.makedirs('results/reports', exist_ok=True)
+
+    # Save Excel - správne bez open
+    comparison.to_excel('results/reports/comparison_table.xlsx', index=False)
+
+    # Optional: Save CSV - ak chceš aj csv verziu
+    with open('results/reports/comparison_table.csv', mode='w', newline='') as file:
+        comparison.to_csv(file, index=False)
+
+    # Draw graphs
+    comparison.plot(x="Model", y=["Classical Accuracy", "Hybrid Accuracy"], kind="bar")
+    plt.title("Porovnanie: Klasické vs Hybridné modely - Presnosť (Accuracy)")
+    plt.ylabel("Presnosť (Accuracy)")
+    plt.ylim(0, 1)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/reports/model_comparison_accuracy.png")
+    plt.show()
+
+    comparison.plot(x="Model", y=["Classical F1-Score", "Hybrid F1-Score"], kind="bar")
+    plt.title("Porovnanie: Klasické vs Hybridné modely - F1 skóre (F1-Score)")
+    plt.ylabel("F1 skóre (F1-Score)")
+    plt.ylim(0, 1)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/reports/model_comparison_f1.png")
+    plt.show()
+
+    comparison.plot(x="Model", y=["Classical Precision", "Hybrid Precision"], kind="bar")
+    plt.title("Porovnanie: Klasické vs Hybridné modely - Presnosť (Precision)")
+    plt.ylabel("Presnosť (Precision)")
+    plt.ylim(0, 1)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/reports/model_comparison_precision.png")
+    plt.show()
+
+    comparison.plot(x="Model", y=["Classical Recall", "Hybrid Recall"], kind="bar")
+    plt.title("Porovnanie: Klasické vs Hybridné modely - Úplnosť (Recall)")
+    plt.ylabel("Úplnosť (Recall)")
+    plt.ylim(0, 1)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/reports/model_comparison_recall.png")
+    plt.show()
 
 
 # Inicializácia
 if __name__ == "__main__":
+    """
     print("\n--- Loading data for hybrid and traditional models ---")
     df_hybrid = preparing_hybrid_features()
 
@@ -268,10 +424,17 @@ if __name__ == "__main__":
           f"({(total_original - filtered_count) / total_original * 100:.2f}%)")
 
     print("\n--- Running hybrid models ---")
-    run_hybrid_models(df_hybrid)
+    hybrid_acc, hybrid_prec, hybrid_rec, hybrid_f1 = run_hybrid_models(df_hybrid)
 
     print("\n--- Running traditional models ---")
-    run_classical_algorithm(df_hybrid)
+    classical_acc, classical_prec, classical_rec, classical_f1 = run_classical_algorithm(df_hybrid)
+
+    compare_models(classical_acc, hybrid_acc,
+                   classical_prec, hybrid_prec,
+                   classical_rec, hybrid_rec,
+                   classical_f1, hybrid_f1)
     # run_fuzzy_classificator()
     # fuzzy_classificator_statistic()
     # find_invalid_features()
+    """
+    load_or_extract_fuzzy_features2()

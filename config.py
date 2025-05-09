@@ -4,13 +4,12 @@ from pathlib import Path
 DATA_PATH = "./data/mit/"
 
 # Zoznam záznamov z MIT-BIH databázy (možno rozšíriť podľa potreby)
-RECORD_NAMES = [
-    "100", "101", "102", "103", "104", "106", "107", "108", "109",
-    "111", "112", "113", "115", "116", "117", "118", "119",
-    "121", "122", "123", "124", "200", "201", "202", "205",
-    "207", "208", "209",  "212", "213", "214", "217", "219",
-    "220", "221", "222", "223", "228", "230", "231", "232",
-    "233", "234"
+ALL_RECORDS = [
+    "100","101","102","103","104","105","106","107","108","109",
+    "111","112","113","114","115","116","117","118","119",
+    "121","122","123","124","200","201","202","203","205","207",
+    "208","209","210","212","213","214","215","217","219","220",
+    "221","222","223","228","230","231","232","233","234"
 ]
 RECORD_NAMES2 = [
     "100",
@@ -46,6 +45,17 @@ DATA_CACHE_DIR = RESULTS_DIR / "data"
 
 # Cache súbory
 FUZZY_FEATURE_CACHE = DATA_CACHE_DIR / "fuzzy_feature_cache.npz"
+FUZZY_FEATURE_CACHE_CAMFEA = DATA_CACHE_DIR / "fuzzy_feature_cache_camfea.npz"
 CNN_SEGMENT_CACHE = DATA_CACHE_DIR / "cnn_segments_fuzzy.npz"
 CNN_RESULTS_CSV = REPORTS_DIR / "cnn_vs_hybrid_comparison.csv"
 QRS_COMPARISON_CSV = REPORTS_DIR / "qrs_comparison.csv"
+
+
+MIT_LOCAL_DIR = Path(__file__).resolve().parent / "data" / "mit"
+##new thigns
+LEAD = "MLII"
+OUT_DIR = Path("mitdb_fuzzy_results")   # každé CSV pôjde sem
+FEAT_DIR = Path("exported_features")
+MF_CFG_PATH = BASE_DIR / "mf_params_all.json"
+
+OUT_TRAIN_FUZZY = BASE_DIR / "exported_features_fuzzy"

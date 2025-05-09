@@ -1,35 +1,26 @@
 # preprocessing/annotation_mapping.py
 import numpy as np
-
+# preprocessing/annotation_mapping.py
+EXCLUDED_ANN = {"+", "[", "]", "~", "|", '"', "x", "U"}
 ANNOTATION_TO_FUZZY = {
-    "N": "Normal",  # normálny sínusový úder
+    "N": "normalna", ".": "normalna",
 
-    "L": "Moderate",  # LBBB môže indikovať závažnejší stav
-    "R": "Moderate",  # RBBB môže indikovať závažnejší stav
-    "e": "Moderate",  # predsieňový únikový úder môže indikovať poruchu
-    "j": "Moderate",  # junkčný únikový úder indikujúci poruchu vedenia
-    "A": "Moderate",  # predsieňový extrasystol (riziko fibrilácie predsiení)
-    "a": "Moderate",  # aberantný predsieňový extrasystol
-    "J": "Moderate",  # junkčný extrasystol
-    "S": "Moderate",  # supraventrikulárny extrasystol
-    "F": "Moderate",  # fúzny úder naznačuje komorovú ektopickú aktivitu
+    # SVEB, artefakty, pacemaker → mierna
+    "L": "mierna", "R": "mierna", "e": "mierna", "j": "mierna",
+    "A": "mierna", "a": "mierna", "J": "mierna", "S": "mierna",
+    "P": "mierna", "/": "mierna", "f": "mierna",
 
-    "V": "Severe",    # komorová extrasystola (potenciálne riziková)
-    "E": "Severe",    # komorový únikový úder (potenciálne rizikový)
-    "!": "Severe",    # flutter komôr (život ohrozujúci)
-    "[": "Severe",    # začiatok fibrilácie/flutteru komôr (život ohrozujúci)
-    "]": "Severe",    # koniec fibrilácie/flutteru komôr
+    # komorové, fúzia, asystólia → **zavazna**
+    "V": "zavazna", "E": "zavazna", "!": "zavazna", "F": "zavazna",
 }
 
+
 def map_annotations_to_peaks(r_peaks, ann_samples, ann_symbols):
-    """
-    Priradí najbližšiu anotáciu ku každému detegovanému R-vrcholu
-    a mapuje ju na fuzzy triedu (Normal / Moderate / Severe).
-    """
-    mapped_labels = []
+    """Ku každému R-vrcholu priradí najbližší MIT-BIH symbol a premapuje na normalna/mierna/zavazna."""
+    mapped = []
     for r in r_peaks:
         idx = np.argmin(np.abs(ann_samples - r))
         symbol = ann_symbols[idx]
-        fuzzy_label = ANNOTATION_TO_FUZZY.get(symbol, "Unknown")
-        mapped_labels.append(fuzzy_label)
-    return mapped_labels
+        if symbol not in EXCLUDED_ANN:               # ← tu bolo zle meno
+            mapped.append(ANNOTATION_TO_FUZZY.get(symbol, "normalna"))
+    return mapped
