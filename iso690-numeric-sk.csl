@@ -113,9 +113,9 @@
     <group prefix=" [cit. " suffix="]. ">
       <!--<text term="cited" text-case="lowercase" suffix=" "/>-->
       <date variable="accessed">
-        <date-part name="year" suffix="-"/>
-        <date-part name="month" suffix="-" form="numeric-leading-zeros"/>
-        <date-part name="day" form="numeric-leading-zeros"/>
+        <date-part name="day" suffix=". "/>
+        <date-part name="month" form="long" suffix=" "/>
+        <date-part name="year"/>
       </date>
     </group>
   </macro>
