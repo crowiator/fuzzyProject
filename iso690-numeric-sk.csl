@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <style xmlns="http://purl.org/net/xbiblio/csl" version="1.0" default-locale="sk-SK" class="in-text">
   <info>
-    <title>ISO-690 (numeric, SK – upravený dátum a URL)</title>
-    <id>http://www.zotero.org/styles/iso690-numeric-sk-upraveny-url</id>
+    <title>ISO 690 numeric – FINAL bez zátvoriek</title>
+    <id>http://www.zotero.org/styles/iso690-numeric-sk-final</id>
     <link href="http://www.zotero.org/styles/iso690-numeric-sk" rel="self"/>
     <link href="http://vili.uniba.sk/AK/citovanie_priklady.pdf" rel="documentation"/>
     <author>
@@ -120,13 +120,13 @@
     </group>
   </macro>
   <macro name="availability">
-  <choose>
-    <if variable="URL">
-      <text value="Dostupné na internete: "/>
-      <text variable="URL"/>
-    </if>
-  </choose>
-</macro>
+    <choose>
+      <if variable="URL">
+        <text value="Dostupné na internete: "/>
+        <text variable="URL"/>
+      </if>
+    </choose>
+  </macro>
   <macro name="publisher">
     <group delimiter=": ">
       <choose>
