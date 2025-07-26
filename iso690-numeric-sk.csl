@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <style xmlns="http://purl.org/net/xbiblio/csl" version="1.0" default-locale="sk-SK" class="in-text">
   <info>
-    <title>ISO-690 (numeric, Slovenčina)</title>
-    <id>http://www.zotero.org/styles/iso690-numeric-sk</id>
+    <title>ISO-690 (numeric, SK – upravený dátum)</title>
+    <id>http://www.zotero.org/styles/iso690-numeric-sk-upraveny</id>
     <link href="http://www.zotero.org/styles/iso690-numeric-sk" rel="self"/>
     <link href="http://vili.uniba.sk/AK/citovanie_priklady.pdf" rel="documentation"/>
     <author>
@@ -113,9 +113,9 @@
     <group prefix=" [cit. " suffix="]. ">
       <!--<text term="cited" text-case="lowercase" suffix=" "/>-->
       <date variable="accessed">
-        <date-part name="day" form="numeric-leading-zeros"/>
-        <date-part name="month" suffix="-" form="numeric-leading-zeros"/>
-        <date-part name="year" suffix="-"/>
+        <date-part name="day" suffix="." form="numeric-leading-zeros"/>
+        <date-part name="month" suffix="." form="numeric-leading-zeros"/>
+        <date-part name="year"/>
       </date>
     </group>
   </macro>
